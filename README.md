@@ -46,6 +46,17 @@ never. A ballast file updates monthly from public dumps, with zero retraining,
 zero fine-tuning, zero re-download of the model. Version the knowledge like
 software, not like a $10M training run.
 
+**"We can't send data to anyone's API."** Air-gapped and offline environments
+are where this design stops being an optimization and becomes the only option.
+The usual hallucination fixes — web search, hosted RAG, embedding APIs — all
+assume a network. A ballast is a static, auditable, CC0 file: copy it across the
+gap once, and a small local model gains a verifiable knowledge layer with **zero
+network dependency at answer time**. Same story for ships, aircraft, field
+deployments, clinics, factory floors, and anywhere data-residency rules make
+"just call an API" a non-starter. And because it's one inspectable artifact with
+a version stamp — not a live service — you can audit exactly what your model is
+allowed to know.
+
 **"Serving costs don't scale."** For anyone thinking about unit economics: if a
 2B-engine + sidecar-knowledge setup matches a 12B on factual work, that's ~6×
 less compute per token on the dominant cost line, and the knowledge sidecar
@@ -59,6 +70,9 @@ and becomes a cached, shared, one-copy-per-cluster asset.
   disk. L2 is 107 MB and already lifts E2B past E4B's raw accuracy.
 - **Edge & embedded** — phones, robots, offline appliances: engine in silicon,
   facts in flash, updates over the air without touching weights.
+- **Air-gapped operators** — defense, healthcare, industrial, anywhere the
+  network is off-limits: the full knowledge layer crosses the gap as one
+  auditable file and works entirely offline.
 - **Fleet operators** — serve smaller engines, mount one shared knowledge
   artifact per cluster, refresh it monthly.
 - **Old-model owners** — grounded ceilings compress across generations (once
