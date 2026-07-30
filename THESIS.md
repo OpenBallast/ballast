@@ -30,8 +30,27 @@ inference time — is the semiparametric/retrieval-augmented line: kNN-LM
 RETRO (Borgeaud et al., 2022), Atlas (Izacard et al., 2022). RETRO and Atlas in
 particular established that a small model plus retrieval can match a much larger
 one. Mallen et al. (2023) established the specific fact this project leans
-hardest on: parametric memory tracks entity *popularity*, and retrieval helps
-exactly where popularity runs out.
+hardest on: parametric memory tracks entity *popularity*, retrieval helps
+exactly where popularity runs out — and can even *hurt* at the head, which is
+why selection (not just retrieval) is the interesting problem.
+
+The packaging idea follows two existing format precedents. Weights have **GGUF**
+(llama.cpp; Gerganov et al.): one file, quantization levels, works everywhere.
+Offline reading has **ZIM** (openZIM/Kiwix), which spent two decades proving a
+reference corpus can ship as one portable, versioned, offline artifact.
+Knowledge for models has no equivalent — every retrieval corpus is a bespoke
+pipeline and somebody's Docker Compose file. Ballast is an attempt at that
+missing third format, and takes the artifact model directly from those two.
+
+The compression and access layer is borrowed whole from the data-engineering
+stack: **Apache Parquet** columnar storage under **zstd** compression (Collet &
+Kucherawy, RFC 8878), **Hive-style partitioning** (Thusoo et al., 2009) — which
+is what makes levels real: buckets are directory prefixes any engine prunes
+without reading, so truncation happens at download time — and **DuckDB**
+(Raasveldt & Mühleisen, 2019) as the in-process query engine, so the artifact is
+readable on a laptop or an edge worker with zero servers. None of that is ours;
+the contribution is noticing this stack is the right shape for quantizable model
+knowledge.
 
 What this project adds is artifact discipline on top of that literature: the
 datastore as a *versioned, CC0, standalone release* rather than a lab-internal
@@ -166,8 +185,10 @@ Data: Wikidata contributors, CC0.
 
 ## 8. References
 
-- Allen-Zhu, Z. & Li, Y. (2024). *Physics of Language Models: Part 3.3, Knowledge Capacity Scaling Laws.* [arXiv:2404.05405](https://arxiv.org/abs/2404.05405)
+- Allen-Zhu, Z. & Li, Y. (2024). *Physics of Language Models: Part 3.3, Knowledge Capacity Scaling Laws.* ICLR 2025. [arXiv:2404.05405](https://arxiv.org/abs/2404.05405)
+- Apache Parquet. *Columnar storage format.* [parquet.apache.org](https://parquet.apache.org)
 - Borgeaud, S. et al. (2022). *Improving Language Models by Retrieving from Trillions of Tokens* (RETRO). [arXiv:2112.04426](https://arxiv.org/abs/2112.04426)
+- Collet, Y. & Kucherawy, M. (2021). *Zstandard Compression and the application/zstd Media Type.* [RFC 8878](https://www.rfc-editor.org/rfc/rfc8878)
 - Brown, T. et al. (2020). *Language Models are Few-Shot Learners* (GPT-3). [arXiv:2005.14165](https://arxiv.org/abs/2005.14165)
 - Dettmers, T. et al. (2023). *QLoRA: Efficient Finetuning of Quantized LLMs* (NF4). [arXiv:2305.14314](https://arxiv.org/abs/2305.14314)
 - Devvrit et al. (2023). *MatFormer: Nested Transformer for Elastic Inference.* [arXiv:2310.07707](https://arxiv.org/abs/2310.07707)
@@ -185,9 +206,12 @@ Data: Wikidata contributors, CC0.
 - Lewis, P. et al. (2020). *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks* (RAG). [arXiv:2005.11401](https://arxiv.org/abs/2005.11401)
 - Lin, S., Hilton, J. & Evans, O. (2022). *TruthfulQA: Measuring How Models Mimic Human Falsehoods.* [arXiv:2109.07958](https://arxiv.org/abs/2109.07958)
 - Mallen, A. et al. (2023). *When Not to Trust Language Models: Investigating Effectiveness of Parametric and Non-Parametric Memories* (PopQA). [arXiv:2212.10511](https://arxiv.org/abs/2212.10511)
+- openZIM contributors. *The ZIM file format* (Kiwix offline content archives). [openzim.org](https://openzim.org)
 - Petroni, F. et al. (2019). *Language Models as Knowledge Bases?* (LAMA). [arXiv:1909.01066](https://arxiv.org/abs/1909.01066)
+- Raasveldt, M. & Mühleisen, H. (2019). *DuckDB: an Embeddable Analytical Database.* SIGMOD 2019. [doi:10.1145/3299869.3320212](https://doi.org/10.1145/3299869.3320212)
 - Rajpurkar, P., Jia, R. & Liang, P. (2018). *Know What You Don't Know: Unanswerable Questions for SQuAD* (SQuAD 2.0). [arXiv:1806.03822](https://arxiv.org/abs/1806.03822)
 - Shi, F. et al. (2023). *Large Language Models Can Be Easily Distracted by Irrelevant Context.* [arXiv:2302.00093](https://arxiv.org/abs/2302.00093)
+- Thusoo, A. et al. (2009). *Hive: A Warehousing Solution Over a Map-Reduce Framework.* VLDB 2(2). [doi:10.14778/1687553.1687609](https://doi.org/10.14778/1687553.1687609)
 - Vrandečić, D. & Krötzsch, M. (2014). *Wikidata: A Free Collaborative Knowledgebase.* CACM 57(10). [doi:10.1145/2629489](https://doi.org/10.1145/2629489)
 - Vu, T. et al. (2023). *FreshLLMs: Refreshing Large Language Models with Search Engine Augmentation* (FreshQA). [arXiv:2310.03214](https://arxiv.org/abs/2310.03214)
 - Wei, J. et al. (2024). *Measuring Short-Form Factuality in Large Language Models* (SimpleQA). [arXiv:2411.04368](https://arxiv.org/abs/2411.04368)
