@@ -185,6 +185,18 @@ Same ladder at nf4 (own axis, never silently compared to bf16):
 | Gemma-4-E4B | 0.485 (**−0.177**) | 0.650 (**−0.260**) |
 | Gemma-4-12B | 0.673 (−0.010) | 0.903 (−0.007) |
 
+The full pivot sweep (E4B, 12B at bf16 / fp8 / nf4) shows it as a dose-response:
+
+| quant | E4B raw → ballasted | 12B raw → ballasted |
+|---|---|---|
+| bf16 | 0.662 → 0.910 | 0.683 → 0.910 |
+| fp8 | 0.632 → 0.841 | 0.677 → 0.906 |
+| nf4 | 0.485 → **0.650** | 0.673 → 0.903 |
+
+The 12B's grounded ceiling is untouched across the entire sweep (0.910 → 0.903);
+E4B's collapses monotonically with quantization depth (0.910 → 0.841 → 0.650).
+(GGUF K-quant cells pending.)
+
 Two lessons. First, nf4 damage is architecture-dependent, not size-monotonic:
 E2B and 12B ride it nearly free while E4B falls off a cliff. Second — and the
 important one for this thesis — when quantization damages the *engine*, ballast
