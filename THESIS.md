@@ -175,6 +175,28 @@ Competence models hit **AUC 0.774 (E2B), 0.807 (E4B), 0.807 (12B)** on held-out 
 
 The entire loop runs end-to-end on consumer hardware: a 16 GB desktop GPU holding both Gemma members, grounded by the corpus served from a free-tier edge endpoint. First 4-probe tail-PopQA spot check through open-ended generation: raw **0/4 and 0/4**; ballasted **2/4 and 3/4** (both remaining misses are grader strictness, e.g. "Eastern Orthodox Christianity" vs gold "Eastern Orthodox Church"). The raw models hallucinate *differently* (London vs Surrey for Douglas Adams's birthplace); one ~440 ms edge lookup corrects both.
 
+### 4.6 Weight quantization interacts — the nf4 axis
+
+Same ladder at nf4 (own axis, never silently compared to bf16):
+
+| model @ nf4 | raw (Δ vs bf16) | + full ballast (Δ vs bf16) |
+|---|---|---|
+| Gemma-4-E2B | 0.587 (−0.021) | 0.842 (−0.026) |
+| Gemma-4-E4B | 0.485 (**−0.177**) | 0.650 (**−0.260**) |
+| Gemma-4-12B | 0.673 (−0.010) | 0.903 (−0.007) |
+
+Two lessons. First, nf4 damage is architecture-dependent, not size-monotonic:
+E2B and 12B ride it nearly free while E4B falls off a cliff. Second — and the
+important one for this thesis — when quantization damages the *engine*, ballast
+cannot buy it back: E4B@nf4's grounded ceiling collapses along with its raw
+floor, i.e. nf4 broke its ability to read evidence, and no amount of corpus
+fixes a broken reader. The community's "Q4 made it unusable" experience and the
+"Q4 is free" experience are both real; they happen on different models, and the
+grounded ceiling is the diagnostic that tells them apart. Corollary: at nf4 the
+*smaller* Gemma is strictly better once ballasted (0.842 vs 0.650), and
+E2B@nf4 + full ballast — under 3 GB of total footprint — beats the raw
+12B bf16 (0.842 vs 0.683 on ~24 GB).
+
 ## 5. Honest caveats
 
 - **Retrieval is oracle-grade in the matrix**: probes carry subject identifiers, so grounding measures the corpus's value under perfect entity resolution — an upper bound. The live demo uses real (dumb-but-precise) linking; end-to-end retriever numbers are future work.
