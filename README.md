@@ -106,19 +106,33 @@ The live demo uses real linking and shows the same effect. Caveats:
 
 | what | where |
 |---|---|
-| **T0 corpus** (25.4M entities, 197M triples, 1.51 GB, levels L0–L7) | [huggingface.co/datasets/OpenBallast/ballast-t0](https://huggingface.co/datasets/OpenBallast/ballast-t0) |
+| **`ballast` CLI** (pull the corpus, ground Ollama / any MCP client) | [github.com/OpenBallast/ballast-cli](https://github.com/OpenBallast/ballast-cli) |
+| **T0 corpus** (25.4M entities, 197M triples, levels L0–L7) | [huggingface.co/datasets/OpenBallast/ballast-t0](https://huggingface.co/datasets/OpenBallast/ballast-t0) |
 | **Eval sets** (50k linked probes) | [huggingface.co/datasets/OpenBallast/ballast-evalsets](https://huggingface.co/datasets/OpenBallast/ballast-evalsets) |
 | **Live demo endpoint** (MCP + HTTP, L0–L5) | [mcp.openballast.org](https://mcp.openballast.org) — see [docs/mcp.md](docs/mcp.md) |
 
 ## Try it
 
+Locally, against Ollama (this is the plug-and-play path):
+
+```bash
+uvx --from git+https://github.com/OpenBallast/ballast-cli openballast pull --level 3
+uvx --from git+https://github.com/OpenBallast/ballast-cli openballast serve
+# point your client at http://localhost:11435/v1 instead of :11434 — done
+```
+
+(PyPI package coming; it becomes just `uvx openballast`.)
+
+First live A/B on a 0.5B model: raw answer to "Where was Douglas Adams born?"
+was *Dublin*; through the proxy, *Cambridge*.
+
+Or without installing anything:
+
 ```bash
 curl "https://mcp.openballast.org/lookup?question=Where+was+Douglas+Adams+born%3F&level=5"
 ```
 
-Or add `https://mcp.openballast.org/mcp` to any MCP client and call `lookup`
-before answering factual questions. The endpoint is a demo; canonical downloads
-live on Hugging Face.
+The hosted endpoint is a demo; canonical downloads live on Hugging Face.
 
 ## Docs
 

@@ -177,6 +177,7 @@ The entire loop runs end-to-end on consumer hardware: a 16 GB desktop GPU holdin
 | surface | role |
 |---|---|
 | [huggingface.co/OpenBallast](https://huggingface.co/OpenBallast) | **canonical artifacts** — the T0 corpus and eval sets, versioned |
+| [github.com/OpenBallast/ballast-cli](https://github.com/OpenBallast/ballast-cli) | **local tooling** — `ballast pull/serve`: OpenAI grounding proxy + MCP server over the corpus, offline |
 | [mcp.openballast.org](https://mcp.openballast.org) | live **demo endpoint** (MCP + HTTP) — levels L0–L5 served from a $0/month free-tier stack |
 | [github.com/OpenBallast](https://github.com/OpenBallast) | docs, spec, this document |
 | [openballast.org](https://openballast.org) | landing |
