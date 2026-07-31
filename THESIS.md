@@ -112,7 +112,7 @@ The one approximation — evidence content also thins under truncation — is ch
 
 Three ways to spend bytes on knowledge — parameter count, parameter precision, corpus — measured on one probe set:
 
-- **Size ladders at bf16**: Gemma-4 E2B / E4B / 12B; Qwen3.5 0.8B / 2B / 4B / 9B (in progress).
+- **Size ladders at bf16**: Gemma-4 E2B / E4B / 12B; Qwen3.5 0.8B / 2B / 4B / 9B.
 - **Gemma span at nf4** including the 31B (the only quant where it fits 32 GB), kept on its own axis so nf4 damage is never silently compared to bf16.
 - **Quant sweep** on pivots (E4B, 12B): bf16 / fp8 / nf4 (Dettmers et al., 2023) / Q6_K / Q4_K_M (llama.cpp GGUF K-quants; Gerganov et al.) — GGUF K-quants scored via dequantization so the quantization error is preserved verbatim while deployment bytes are charged at the .gguf size.
 
@@ -135,6 +135,26 @@ A second probe family tests whether ballast reduces hallucination when copy-extr
 | Gemma-4-12B | 0.683 | **0.910** | 0.207 → 0.049 |
 
 Grounded ceilings compress (E4B ≈ 12B once ballasted); raw floors spread. Generations differ in what they know far more than in what they can read.
+
+### 4.1b Second family: Qwen3.5 (bf16, same probes)
+
+| model | raw accuracy | + full ballast (1.51 GB) | hallucination raw → ballasted |
+|---|---|---|---|
+| Qwen3.5-0.8B | 0.324 | **0.784** | 0.601 → **0.114** |
+| Qwen3.5-2B | 0.363 | 0.770 | 0.552 → 0.137 |
+| Qwen3.5-4B | 0.434 | **0.831** | 0.474 → **0.095** |
+| Qwen3.5-9B | 0.542 | 0.819 | 0.329 → 0.113 |
+
+The pattern replicates across an unrelated family, and sharpens: raw floors
+spread 0.32–0.54 while grounded ceilings land in a 0.77–0.83 band — and the
+**ballasted 4B beats the ballasted 9B outright** (0.831 vs 0.819). Crossings:
+0.8B + 62 MB (L1) exceeds the 4B raw (0.443 vs 0.434); 0.8B + 180 MB (L3)
+exceeds the 9B raw (0.552 vs 0.542) — the parameter route to that gain is
+~16 GB of weights, a ~90× byte disadvantage. The 0.8B's hallucination rate
+falls more than 5× (0.601 → 0.114). Families do differ in grounded ceiling
+(Gemma ~0.91 vs Qwen ~0.82 on the same evidence) — reading ability varies
+across lineages — but the within-family structure (floors spread, ceilings
+compress, head-heavy value-per-byte) is identical.
 
 ### 4.2 Equal-bytes crossings — the headline
 
@@ -168,7 +188,7 @@ The entire loop runs end-to-end on consumer hardware: a 16 GB desktop GPU holdin
 
 - Boost verdicts: gap-closed curves for E2B→E4B, E2B→31B, and the **quant-damage buyback** arm (12B Q4_K_M → Q6_K: what fraction of quantization's knowledge loss does targeted ballast recover, per MB).
 - Hallucination-beyond-recall verdicts (composition, fabrication, control).
-- Qwen3.5 ladder completion; Gemma-4-31B; cross-family miss-set overlap — if families miss *different* facts, a shared ballast is worth more than either family's tuning.
+- Gemma-4-31B; cross-family miss-set overlap — if families miss *different* facts, a shared ballast is worth more than either family's tuning. (Qwen3.5 ladder: done, §4.1b.)
 - Legacy revival cells (Mistral-7B-class): grounding as a generation equalizer.
 - Tooling for third parties to build and tune their own ballasts (to be open-sourced separately).
 
