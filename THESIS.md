@@ -211,51 +211,59 @@ E2B@nf4 + full ballast — under 3 GB of total footprint — beats the raw
 
 ### 4.7 Realized retrieval — de-oracling the headline
 
+*(Correction, 2026-08-01: an earlier version of this section reported that
+wrong entity links were as harmful as right links were helpful, and on that
+basis ranked precision-first linkers highest at ~34% realization. That harm
+number came from a padding-misaligned scoring harness — caught within hours by
+cross-checking against the banked per-probe passes — and reversed on
+re-measurement. The corrected numbers below supersede it; the audit trail
+lives in the research repo.)*
+
 The matrix assumes perfect entity resolution. We measured what a real,
 non-generative linker (capitalized-span mining + normalized name index)
-actually realizes on the same 50,147 probes, and priced its failure modes:
+actually realizes on the same 50,147 probes, and priced its failure modes
+directly:
 
 - A linked probe resolving to the **right** entity realizes that probe's
-  grounded outcome. A **miss** (nothing linked) falls back to ungrounded —
-  free. A **wrong link** attaches a homonym's facts, and a dedicated GPU pass
-  (854 wrong-linked probes, E2B) shows this is *actively harmful*: accuracy
-  0.423 → 0.159, hallucination-per-attempt 0.345 → 0.536. Wrong evidence costs
-  roughly what right evidence gains.
-- Composing per-probe over seven linker variants (E2B bf16): the naive precise
-  linker realizes **26.7%** of the oracle gain; adding context disambiguation
-  (question-token overlap against candidate evidence, blended with notability)
-  lifts it to **34.1%**. Every recall-raising variant tested — lowercase
-  fallback mining, FTS5 fuzzy matching, gated combinations — *reduced* realized
-  gain (to 15–20%), because they convert free misses into costly wrong links.
-- The thesis's erasure-vs-substitution asymmetry (§3.3) therefore applies to
-  the retriever itself: **a linker that shrugs beats a linker that guesses.**
-  The shipped CLI and demo endpoint run the 34% configuration; recall additions
-  are opt-in.
+  grounded outcome (+17 accuracy points on the hit slice, hallucination
+  halved). A **miss** links nothing and falls back to ungrounded — free.
+- A **wrong link** attaches a homonym's facts, and — measured on a dedicated
+  GPU pass over 1,025 wrong-linked probes — is **approximately neutral**
+  (accuracy 0.311 → 0.325): the model largely ignores evidence irrelevant to
+  the question. Hedged framing ("may be unrelated — ignore if so") changes
+  nothing in either direction.
+- Because wrong links are cheap and misses forgo gain, **hit-rate is the
+  objective**, and recall machinery pays. Composing per-probe over seven
+  linker variants (E2B bf16, wrong links conservatively scored as exactly
+  neutral): the naive precise linker realizes **52%** of the oracle gain;
+  adding context disambiguation, lowercase fallback mining, and FTS5 fuzzy
+  matching lifts the band to **63–66%**. The shipped CLI and demo endpoint run
+  a mid-band configuration (~63%).
 
-**What the floor does to the headline crossings — stated plainly.** At 34%
-realization, E2B + the full 1.51 GB ballast lands at ≈0.70 end-to-end against
-the 12B's raw 0.683: the full-corpus crossing survives, but barely — within
-noise. The sharper claim, **"E2B + 180 MB beats the 12B raw," does not hold at
-today's retrieval floor** (≈0.64 vs 0.683); it is an oracle-ceiling statement.
-Two qualifications keep this honest in both directions. First, the probe
-setting — mining entity mentions out of raw natural-language trivia questions —
-is close to worst-case retrieval; when the *model* supplies the mention (the
-MCP tool-calling path: `resolve("Douglas Adams")`), the name index resolves
-clean mentions at ~88%, putting agent-mode deployments near the ceiling, not
-the floor. Second, the floor is one afternoon old and moved 7 points in that
-afternoon.
+**What the floor does to the headline crossings — stated plainly.** At ~63%
+realization, E2B + the full 1.51 GB ballast lands at ≈0.77 end-to-end against
+the 12B's raw 0.683 — the full-corpus crossing holds comfortably. The sharper
+oracle claim "E2B + 180 MB beats the 12B raw" moves to **E2B + ~470 MB (L5)**
+at the realized floor (L3 composes to ≈0.67, just under; L5 to ≈0.71). The
+byte advantage versus the ~19.4 GB parameter route remains ~40×. Two further
+qualifications, in opposite directions: the probe setting — mining mentions
+from raw natural-language trivia — is close to worst-case retrieval, and the
+agent path (the model calls `resolve("Douglas Adams")` with a clean mention,
+resolved at ~88%) sits near the ceiling, not the floor; conversely, these
+compositions inherit the harm sample's CIs and the probe set's popularity mix.
 
 This turns the former "oracle retrieval" caveat into a measured band: the
-corpus's value is the ceiling, a trivial linker holds a third of it, and the
-remaining gap is an engineering ladder (typed disambiguation, retrieval-quality
-levels R0–R7) with a per-rung measurement already in place — not an assumption.
+corpus's value is the ceiling, a weekend-grade linker holds about two thirds
+of it, and the remaining gap is an engineering ladder (typed disambiguation,
+retrieval-quality levels R0–R7) with a per-rung measurement in place — not an
+assumption.
 
 ## 5. Honest caveats
 
 - **Retrieval realization is a band, not a point**: matrix numbers are the
-  perfect-resolution ceiling; the measured trivial linker realizes ~34% of the
-  grounding gain end-to-end (§4.7). Retrieval-side improvements move within
-  that band without touching the artifact.
+  perfect-resolution ceiling; the measured non-generative linker realizes ~63%
+  of the grounding gain end-to-end (§4.7). Retrieval-side improvements move
+  within that band without touching the artifact.
 - **Coverage cap**: the corpus grounds 90.5% of probe subjects; the remainder bounds grounded accuracy.
 - **Abstention-thresholded metrics**: raw forced-choice gaps are smaller than triad numbers.
 - **Contamination**: models have seen Wikipedia/Wikidata in pretraining. The self-generated benchmark is uncontaminated by construction; external sets serve as robustness checks; and the interesting quantity (grounded − ungrounded delta) is contamination-*conservative* — pretraining exposure inflates the raw floor, not the gain.
