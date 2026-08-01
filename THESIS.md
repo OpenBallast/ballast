@@ -209,9 +209,40 @@ grounded ceiling is the diagnostic that tells them apart. Corollary: at nf4 the
 E2B@nf4 + full ballast — under 3 GB of total footprint — beats the raw
 12B bf16 (0.842 vs 0.683 on ~24 GB).
 
+### 4.7 Realized retrieval — de-oracling the headline
+
+The matrix assumes perfect entity resolution. We measured what a real,
+non-generative linker (capitalized-span mining + normalized name index)
+actually realizes on the same 50,147 probes, and priced its failure modes:
+
+- A linked probe resolving to the **right** entity realizes that probe's
+  grounded outcome. A **miss** (nothing linked) falls back to ungrounded —
+  free. A **wrong link** attaches a homonym's facts, and a dedicated GPU pass
+  (854 wrong-linked probes, E2B) shows this is *actively harmful*: accuracy
+  0.423 → 0.159, hallucination-per-attempt 0.345 → 0.536. Wrong evidence costs
+  roughly what right evidence gains.
+- Composing per-probe over seven linker variants (E2B bf16): the naive precise
+  linker realizes **26.7%** of the oracle gain; adding context disambiguation
+  (question-token overlap against candidate evidence, blended with notability)
+  lifts it to **34.1%**. Every recall-raising variant tested — lowercase
+  fallback mining, FTS5 fuzzy matching, gated combinations — *reduced* realized
+  gain (to 15–20%), because they convert free misses into costly wrong links.
+- The thesis's erasure-vs-substitution asymmetry (§3.3) therefore applies to
+  the retriever itself: **a linker that shrugs beats a linker that guesses.**
+  The shipped CLI and demo endpoint run the 34% configuration; recall additions
+  are opt-in.
+
+This turns the former "oracle retrieval" caveat into a measured band: the
+corpus's value is the ceiling, a trivial linker holds a third of it, and the
+remaining gap is an engineering ladder (typed disambiguation, retrieval-quality
+levels R0–R7) with a per-rung measurement already in place — not an assumption.
+
 ## 5. Honest caveats
 
-- **Retrieval is oracle-grade in the matrix**: probes carry subject identifiers, so grounding measures the corpus's value under perfect entity resolution — an upper bound. The live demo uses real (dumb-but-precise) linking; end-to-end retriever numbers are future work.
+- **Retrieval realization is a band, not a point**: matrix numbers are the
+  perfect-resolution ceiling; the measured trivial linker realizes ~34% of the
+  grounding gain end-to-end (§4.7). Retrieval-side improvements move within
+  that band without touching the artifact.
 - **Coverage cap**: the corpus grounds 90.5% of probe subjects; the remainder bounds grounded accuracy.
 - **Abstention-thresholded metrics**: raw forced-choice gaps are smaller than triad numbers.
 - **Contamination**: models have seen Wikipedia/Wikidata in pretraining. The self-generated benchmark is uncontaminated by construction; external sets serve as robustness checks; and the interesting quantity (grounded − ungrounded delta) is contamination-*conservative* — pretraining exposure inflates the raw floor, not the gain.
