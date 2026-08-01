@@ -232,6 +232,19 @@ actually realizes on the same 50,147 probes, and priced its failure modes:
   The shipped CLI and demo endpoint run the 34% configuration; recall additions
   are opt-in.
 
+**What the floor does to the headline crossings — stated plainly.** At 34%
+realization, E2B + the full 1.51 GB ballast lands at ≈0.70 end-to-end against
+the 12B's raw 0.683: the full-corpus crossing survives, but barely — within
+noise. The sharper claim, **"E2B + 180 MB beats the 12B raw," does not hold at
+today's retrieval floor** (≈0.64 vs 0.683); it is an oracle-ceiling statement.
+Two qualifications keep this honest in both directions. First, the probe
+setting — mining entity mentions out of raw natural-language trivia questions —
+is close to worst-case retrieval; when the *model* supplies the mention (the
+MCP tool-calling path: `resolve("Douglas Adams")`), the name index resolves
+clean mentions at ~88%, putting agent-mode deployments near the ceiling, not
+the floor. Second, the floor is one afternoon old and moved 7 points in that
+afternoon.
+
 This turns the former "oracle retrieval" caveat into a measured band: the
 corpus's value is the ceiling, a trivial linker holds a third of it, and the
 remaining gap is an engineering ladder (typed disambiguation, retrieval-quality
