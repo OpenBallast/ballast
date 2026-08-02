@@ -188,7 +188,7 @@ that is hopeful optimism. So we built a caveman one (no embeddings, no model
 calls, just capitalized-phrase matching against a name index) and measured what
 it actually delivers: **about two thirds** of the ideal benefit.
 
-One surprise worth knowing: looking up the *wrong* entity is nearly harmless.
+Interestingly, looking up the *wrong* entity is nearly harmless.
 Feed a model facts about the wrong Douglas Adams and it mostly ignores them. So
 the thing to optimize is finding *something*, not being careful. That's a much
 easier engineering problem.
