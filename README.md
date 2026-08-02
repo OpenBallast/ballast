@@ -32,7 +32,9 @@ versioned, auditable, works offline, and can be rebuilt from public dumps
 whenever you want the knowledge refreshed, without retraining anything. It also
 gives you a diagnostic for whether your quantized model is actually intact.
 
-## What this is
+So go ahead. Download more VRAM.
+
+## Core idea
 
 A language model is two things fused together: something that can reason and
 read, and something that has memorized an encyclopedia. Most of what you get
@@ -49,12 +51,12 @@ questions more accurately than a 12B model does on its own. Buying that same
 accuracy with parameters costs about 19 GB of weights. And those 470 MB sit on
 disk, not in VRAM.
 
-## Problems this addresses
+## Problems we're trying to address
 
 **"Small models are dumb."** Not exactly. They're *ignorant*. Gemma-4-E2B gets
 61% of factual questions right from memory. Hand it a couple of relevant lines
 of evidence and it gets 87%. It could always use the fact; it just never had
-room to store it. That gap is the whole idea.
+room to store it. That gap is what we're trying to measure and exploit.
 
 **"It makes things up."** Attaching the corpus cuts hallucination on that same
 model from 24% to 7%. It isn't just copying answers out of the text either. On
@@ -62,21 +64,21 @@ questions that require chaining two facts together (*"where was the director of
 this film born?"*, where neither line contains the answer alone), made-up
 answers drop by 3–20×.
 
-There's a catch, and we measured it rather than hiding it. When a question has
-**no** true answer, meaning a false premise or a detail nobody ever recorded,
+However we found that when a question has **no** true answer, 
+meaning a false premise or a detail nobody ever recorded,
 evidence makes things *worse*. Fabrication goes from ~22% to ~37%. Handing a
 model a page about the right person seems to read as permission to answer, even
 when the page doesn't contain the answer. So this fixes questions that have
 answers. It does not teach a model to say "I don't know."
 
 **"My GPU only has 8/12/16 GB."** Every gigabyte of weights spent memorizing
-obscure Wikipedia entries is a gigabyte not spent on context or a better engine.
+obscure facts is a gigabyte not spent on context or a better engine.
 Ballast moves those facts to disk, where they're cheap. The whole demo, two
-models plus lookups, runs on one 16 GB desktop card.
+models plus lookups, runs on one 16 GB desktop card (a 4070 TI Super was used).
 
 **"The model's knowledge is stale."** Weights only learn at training time. The
 corpus is built from public dumps and can be rebuilt as often as those dumps
-land, by us or by you. You update what the model knows by swapping a file, with
+land. You update what the model knows by swapping a file, with
 no retraining and no redownloading the model.
 
 **"We can't send data to anyone's API."** Every common fix for hallucination
@@ -87,8 +89,8 @@ anywhere data isn't allowed to leave. It's also one versioned file, so you can
 say exactly what the model does and doesn't have access to.
 
 **"Serving is too expensive."** If a 2B engine with a knowledge file matches a
-12B on factual work, you're running 6× fewer parameters per token. (Partly
-offset: the evidence adds a few hundred tokens to each grounded question.) The
+12B on factual work, you're running 6× fewer parameters per token. (Note: We are
+using a bit of context as the evidence adds a few hundred tokens to each grounded question.) The
 file itself serves from ordinary storage; our demo endpoint costs $0/month. One
 copy of the knowledge per cluster, instead of paying for it in every GPU.
 
@@ -192,11 +194,13 @@ What ballast adds is a way to tell them apart. When a model is merely *forgetful
 after quantization, the file gives the knowledge back. When quantization has
 damaged its ability to read and follow evidence, the score stays low no matter
 how much corpus you hand it. That is what a broken model looks like, and its
-accuracy *with* evidence is the tell.
+accuracy *with* evidence is what's interesting.
 
 Practical consequence: at 4-bit the smaller Gemma is the better model once
 ballasted (84% vs 65%), which reverses the usual ordering. And a 4-bit 2B plus
 the entire corpus, under 3 GB all in, beats the full-precision 12B on ~24 GB.
+
+We intend to continue profiling state of the art open source models as they come out.
 
 ### The thing that didn't work
 
@@ -249,7 +253,7 @@ Or without installing anything:
 curl "https://mcp.openballast.org/lookup?question=Where+was+Douglas+Adams+born%3F&level=5"
 ```
 
-The hosted endpoint is a demo. The real downloads live on Hugging Face.
+The hosted endpoint is a demo. It runs on Cloudflare Free Tier that you can host yourself. The real downloads live on Hugging Face.
 
 ## Docs
 
