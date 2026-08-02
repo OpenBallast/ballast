@@ -1,6 +1,34 @@
 # ⚓ OpenBallast
 
-**Quantize the weights. Ballast the knowledge.**
+## TL;DR
+
+We measured how much of a bigger model's factual advantage is just memorized
+trivia, and whether you can buy that back with a file instead of with
+parameters. You can, and it's 40–100× cheaper per byte.
+
+**What we found, on 50,147 factual questions across two model families:**
+
+- A 2B model with a 470 MB fact file beside it beats a 12B model on its own.
+  Getting there with parameters costs ~19 GB of weights.
+- Once every model can look facts up, they converge — 61/66/68% becomes
+  87/91/91%. What separates a small model from a big one, factually, is mostly
+  what it memorized, not what it can do.
+- Made-up answers drop from 24% to 7%. But on questions with no true answer,
+  evidence makes fabrication *worse* (22% → 37%). This fixes answerable
+  questions; it does not teach a model to abstain.
+- 4-bit quantization damages some models and not others, unpredictably from
+  size. Accuracy *with* evidence tells you which case you're in: a forgetful
+  model recovers, a damaged one doesn't.
+- Building each model a personalized corpus of what it doesn't know loses to
+  one generic corpus, every time. Knowing a model's gaps isn't enough — you'd
+  also need to know what people will ask, and the corpus can't tell you that.
+
+**Why this matters if you deploy models.** The default answer to "it gets facts
+wrong" is a bigger model, and you pay for that in VRAM on every GPU you run.
+This says the cheaper move is a small engine plus a file — and the file is
+static, versioned, auditable, offline-capable, and updated monthly without
+retraining anything. It also gives you a diagnostic for whether your quantized
+model is actually intact.
 
 ## What this is
 
