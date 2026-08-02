@@ -175,7 +175,7 @@ Competence models hit **AUC 0.774 (E2B), 0.807 (E4B), 0.807 (12B)** on held-out 
 
 The entire loop runs end-to-end on consumer hardware: a 16 GB desktop GPU holding both Gemma members, grounded by the corpus served from a free-tier edge endpoint. First 4-probe tail-PopQA spot check through open-ended generation: raw **0/4 and 0/4**; ballasted **2/4 and 3/4** (both remaining misses are grader strictness, e.g. "Eastern Orthodox Christianity" vs gold "Eastern Orthodox Church"). The raw models hallucinate *differently* (London vs Surrey for Douglas Adams's birthplace); one ~440 ms edge lookup corrects both.
 
-### 4.6 Weight quantization interacts — the nf4 axis
+### 4.6 Weight quantization interacts — nf4 and the GGUF K-quants
 
 Same ladder at nf4 (own axis, never silently compared to bf16):
 
@@ -185,23 +185,35 @@ Same ladder at nf4 (own axis, never silently compared to bf16):
 | Gemma-4-E4B | 0.485 (**−0.177**) | 0.650 (**−0.260**) |
 | Gemma-4-12B | 0.673 (−0.010) | 0.903 (−0.007) |
 
-The full pivot sweep (E4B, 12B at bf16 / fp8 / nf4) shows it as a dose-response:
+The full pivot sweep (E4B, 12B at bf16 / fp8 / GGUF K-quants / nf4, ordered by
+bits per weight) shows it as a dose-response:
 
-| quant | E4B raw → ballasted | 12B raw → ballasted |
-|---|---|---|
-| bf16 | 0.662 → 0.910 | 0.683 → 0.910 |
-| fp8 | 0.632 → 0.841 | 0.677 → 0.906 |
-| nf4 | 0.485 → **0.650** | 0.673 → 0.903 |
+| quant | bits/wt | E4B raw → ballasted | 12B raw → ballasted |
+|---|---|---|---|
+| bf16 | 16 | 0.662 → 0.910 | 0.683 → 0.910 |
+| fp8 | 8 | 0.632 → 0.841 | 0.677 → 0.906 |
+| Q6_K | ~6.6 | 0.655 → 0.908 | 0.681 → 0.910 |
+| Q4_K_M | ~4.8 | 0.504 → **0.716** | 0.673 → 0.905 |
+| nf4 | ~4.5 | 0.485 → **0.650** | 0.673 → 0.903 |
 
-The 12B's grounded ceiling is untouched across the entire sweep (0.910 → 0.903);
-E4B's collapses monotonically with quantization depth (0.910 → 0.841 → 0.650).
-(GGUF K-quant cells pending.)
+The 12B's grounded ceiling is untouched across the entire sweep, K-quants
+included (worst case 0.910 → 0.903). E4B's collapses with quantization depth —
+but by format, not monotonically by bits: Q6_K at ~6.6 bits is
+indistinguishable from bf16 on both floor and ceiling (0.655 → 0.908), while
+fp8 at a full eight bits already dents the ceiling (0.841). At the ~4-bit
+level both format families break E4B the same way — Q4_K_M 0.504 → 0.716,
+nf4 0.485 → 0.650. The K-quant is marginally gentler, but the collapse class
+is identical: for E4B the cliff edge sits between ~6.6 and ~4.8 bits
+regardless of whether the quantizer is llama.cpp's K-quant blocks or
+bitsandbytes nf4.
 
-Two lessons. First, nf4 damage is architecture-dependent, not size-monotonic:
-E2B and 12B ride it nearly free while E4B falls off a cliff. Second — and the
+Two lessons. First, quantization damage is architecture-dependent, not
+size-monotonic: E2B and 12B ride even Q4_K_M nearly free while E4B falls off
+a cliff, and Q6_K is free on every cell measured here. Second — and the
 important one for this thesis — when quantization damages the *engine*, ballast
-cannot buy it back: E4B@nf4's grounded ceiling collapses along with its raw
-floor, i.e. nf4 broke its ability to read evidence, and no amount of corpus
+cannot buy it back: E4B's grounded ceiling collapses along with its raw floor
+under both 4-bit formats (0.716 at Q4_K_M, 0.650 at nf4), i.e. deep
+quantization broke its ability to read evidence, and no amount of corpus
 fixes a broken reader. The community's "Q4 made it unusable" experience and the
 "Q4 is free" experience are both real; they happen on different models, and the
 grounded ceiling is the diagnostic that tells them apart. Corollary: at nf4 the
