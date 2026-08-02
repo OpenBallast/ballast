@@ -258,6 +258,64 @@ of it, and the remaining gap is an engineering ladder (typed disambiguation,
 retrieval-quality levels R0–R7) with a per-rung measurement in place — not an
 assumption.
 
+### 4.7 Model-aware selection: a negative result with a measured ceiling
+
+The boost design (§3.4) asked whether a corpus selected for a specific model
+beats the generic notability prefix at equal bytes. For the E2B→E4B pair, it
+does not:
+
+- **Generic selection alone crosses the target**: the rank prefix closes 103%
+  of the E2B→E4B raw gap at L2 (107 MB) and 395% at the full corpus — the
+  "boost past the larger model" effect needs no model-awareness at all.
+- **Both tuned arms lose to generic at every equal-bytes level** (profile:
+  Δ −0.013…−0.137; delta: Δ −0.013…−0.131; McNemar p ≈ 0 throughout). The
+  result is decisive, not marginal.
+- **The oracle ceiling is nonetheless enormous**: an identity-keyed selection
+  of the 1,885 entities the model actually misses closes 213% of the gap in
+  0.9 MB — three orders of magnitude less than the generic corpus needs.
+
+The failure mechanism is visible in the coverage column: at L0 the tuned
+selection grounds 1.5% of probe subjects against the generic prefix's 20.4%.
+Every ingredient of tuned selection works in isolation — competence models
+pass their gates on every cell (AUC 0.66–0.81, §4.4), and miss-sets are
+genuinely model-specific (§4.8) — but the selection objective is *expected
+query mass × predicted ignorance*, and corpus-native features estimate only
+the second factor. Predicted ignorance concentrates in the deep tail, where
+per-entity query mass is smallest; buying it evicts head entities that the
+query distribution actually touches. The oracle succeeds precisely because
+identity keys encode the query distribution. Stated in the terms of §1.1:
+parametric knowledge tracks popularity and is therefore predictable from
+corpus structure, but *demand* — which facts get asked — is a property of the
+query distribution, not the corpus, and no function of corpus-native features
+recovers it. This sharpens, rather than contradicts, the selection problem
+Mallen et al. (2023) pose: knowing *where the model is ignorant* is not
+sufficient; selection needs an independent estimate of what will be asked.
+
+Scope note: this verdict is relative to the benchmark-derived query
+distribution of the probe set. A query distribution concentrated in the deep
+tail would shift the comparison; the oracle row bounds how much.
+
+### 4.8 Miss-set overlap: knowledge holes are lineage-specific
+
+Cohen's κ between miss indicators (beyond accuracy-marginal chance), 41,381
+shared probes:
+
+- **Cross-family κ 0.27–0.55** vs within-family 0.67–0.90. On 39% of probes,
+  Qwen3.5-0.8B misses what Gemma-4-12B knows; the converse set is 2.5%.
+  Different training mixtures leave substantially different holes.
+- **Weight quantization preserves the miss-set**: same-model pairs at
+  different quants agree at κ 0.84–0.90 — quantization mostly shrinks
+  knowledge along the same frontier rather than moving it.
+- **Except Gemma-4-E4B at nf4**: κ 0.54 against its own bf16 — nf4 does not
+  merely shrink E4B's knowledge, it *scrambles* it. This is a third
+  independent signature of the §4.6 cliff (after the raw floor and the
+  grounded ceiling).
+
+Together with §4.7 these two results form a consistent picture: holes are
+model-specific and predictable, yet a single generic corpus serves every
+model measured here better than corpora tuned to each — because the generic
+ranking already approximates the one quantity tuning cannot observe.
+
 ## 5. Honest caveats
 
 - **Retrieval realization is a band, not a point**: matrix numbers are the
@@ -272,7 +330,7 @@ assumption.
 
 ## 6. What's running now / next
 
-- Boost verdicts: gap-closed curves for E2B→E4B, E2B→31B, and the **quant-damage buyback** arm (12B Q4_K_M → Q6_K: what fraction of quantization's knowledge loss does targeted ballast recover, per MB).
+- Boost verdicts for the remaining arms: E2B→31B, and the **quant-damage buyback** arm (12B Q4_K_M → Q6_K: what fraction of quantization's knowledge loss does targeted ballast recover, per MB). (E2B→E4B: measured, §4.7.)
 - Hallucination-beyond-recall verdicts (composition, fabrication, control).
 - Gemma-4-31B; cross-family miss-set overlap — if families miss *different* facts, a shared ballast is worth more than either family's tuning. (Qwen3.5 ladder: done, §4.1b.)
 - Legacy revival cells (Mistral-7B-class): grounding as a generation equalizer.
