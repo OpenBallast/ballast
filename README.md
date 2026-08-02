@@ -53,7 +53,7 @@ disk, not in VRAM.
 
 ## Problems we're trying to address
 
-> ### "Small models are dumb."
+### *"Small models are dumb."*
 
 Not exactly. They're *ignorant*.
 
@@ -63,7 +63,7 @@ just never had room to store it.
 
 That gap is what we're trying to measure and exploit.
 
-> ### "It makes things up."
+### *"It makes things up."*
 
 Attaching the corpus cuts hallucination on that same model from **24% to 7%**.
 
@@ -80,7 +80,7 @@ the answer.
 So this fixes questions that have answers. It does not teach a model to say "I
 don't know."
 
-> ### "My GPU only has 8/12/16 GB."
+### *"My GPU only has 8/12/16 GB."*
 
 Every gigabyte of weights spent memorizing obscure facts is a gigabyte not spent
 on context or a better engine. Ballast moves those facts to disk, where they're
@@ -89,7 +89,7 @@ cheap.
 The whole demo, two models plus lookups, runs on one 16 GB desktop card (a 4070
 Ti SUPER was used).
 
-> ### "The model's knowledge is stale."
+### *"The model's knowledge is stale."*
 
 Weights only learn at training time. The corpus is built from public dumps and
 can be rebuilt as often as those dumps land.
@@ -97,7 +97,7 @@ can be rebuilt as often as those dumps land.
 You update what the model knows by swapping a file, with no retraining and no
 redownloading the model.
 
-> ### "We can't send data to anyone's API."
+### *"We can't send data to anyone's API."*
 
 Every common fix for hallucination (web search, hosted RAG, embedding APIs)
 needs a network connection. This is a static file. Copy it across the air gap
@@ -107,7 +107,7 @@ Useful for defense, healthcare, ships, factory floors, and anywhere data isn't
 allowed to leave. It's also one versioned file, so you can say exactly what the
 model does and doesn't have access to.
 
-> ### "Serving is too expensive."
+### *"Serving is too expensive."*
 
 If a 2B engine with a knowledge file matches a 12B on factual work, you're
 running 6× fewer parameters per token. (Note: we are using a bit of context, as
