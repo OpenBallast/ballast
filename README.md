@@ -225,8 +225,6 @@ It just isn't reachable from the corpus side.
 
 ## Hardware this ran on
 
-No cluster, no rented A100s. Two desktops and a free-tier CDN account.
-
 **Build and evaluation box.** Every number in this README was produced here.
 
 | | |
@@ -241,10 +239,6 @@ model answers questions through the corpus, runs on ordinary gaming hardware.
 |---|---|
 | GPU | NVIDIA GeForce RTX 4070 Ti SUPER, 16 GB VRAM |
 | CPU | AMD Ryzen 7 7800X3D, 8 cores / 16 threads |
-
-**Hosting.** The public endpoint runs entirely on Cloudflare's free tier, which
-you can reproduce yourself for $0. The corpus files are served from Hugging
-Face.
 
 ## Get it
 
