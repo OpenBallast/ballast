@@ -9,16 +9,19 @@ parameters. You can, and it's 40–100× cheaper per byte.
 **What we found, on 50,147 factual questions plus a 43,000-probe hallucination
 suite, across two model families:**
 
-- A 2B model with a 470 MB fact file beside it beats a 12B model on its own.
-  Getting there with parameters costs ~19 GB of weights.
+- A 2B model with a 470 MB fact file beside it beats a 12B model on its own —
+  measured with a real lookup in the loop, not an idealized one. Buying that
+  accuracy with parameters costs ~19 GB of weights at full precision; even
+  charging the 12B at the cheapest quantization that leaves it intact (~7 GB),
+  the file route is still ~15× cheaper per byte.
 - Answering from memory alone, a 2B, a 4B and a 12B from the same family get
   61%, 66% and 68% of those questions right. Give all three the same file to
   look facts up in and they land at 87%, 91% and 91%. What separates a small
   model from a big one, factually, is mostly what it memorized, not what it can
   do.
 - Made-up answers drop from 24% to 7%. But on questions with no true answer,
-  evidence makes fabrication *worse* (22% to 37%). This fixes answerable
-  questions; it does not teach a model to abstain.
+  evidence makes fabrication *worse* (24% to 41% on the largest model). This
+  fixes answerable questions; it does not teach a model to abstain.
 - 4-bit quantization damages some models and not others, unpredictably from
   size. Accuracy *with* evidence tells you which case you're in: a forgetful
   model recovers, a damaged one doesn't.
@@ -29,8 +32,8 @@ suite, across two model families:**
 **Why this matters if you deploy models.** The default answer to "it gets facts
 wrong" is a bigger model, and you pay for that in VRAM on every GPU you run.
 This says the cheaper move is a small engine plus a file. That file is static,
-versioned, auditable, works offline, and can be rebuilt from public dumps
-whenever you want the knowledge refreshed, without retraining anything. It also
+versioned, auditable, works offline, and is rebuilt from public dumps whenever
+the knowledge needs refreshing — you swap a file and retrain nothing. It also
 gives you a diagnostic for whether your quantized model is actually intact.
 
 So go ahead. Download more VRAM.
@@ -43,15 +46,16 @@ from a bigger model is the encyclopedia, and parameters are an expensive place
 to keep facts.
 
 Ballast splits them apart. The facts ship as a plain file that sits next to the
-model, free for anyone to copy or rebuild. It comes in sizes, from 36 MB up to
-1.5 GB (the CLI's ready-to-serve database builds run somewhat larger), so you
-pick how much world knowledge you want the same way you pick a quant. The model
-looks things up in it while answering.
+model, free for anyone to copy. It comes in sizes, from 36 MB up to 1.5 GB (the
+CLI's ready-to-serve database builds run somewhat larger), so you pick how much
+world knowledge you want the same way you pick a quant. The model looks things
+up in it while answering.
 
 The result we measured: a 2B model with a 470 MB file beside it answers factual
-questions more accurately than a 12B model does on its own. Buying that same
-accuracy with parameters costs about 19 GB of weights. And those 470 MB sit on
-disk, not in VRAM.
+questions more accurately than a 12B model does on its own — through a real
+lookup, not an oracle. Buying that same accuracy with parameters costs about
+19 GB of weights at full precision, or about 7 GB at the kindest quantization
+that doesn't damage the 12B. And those 470 MB sit on disk, not in VRAM.
 
 ## Problems we're trying to address
 
@@ -59,8 +63,8 @@ disk, not in VRAM.
 
 Not exactly. They're *ignorant*.
 
-Gemma-4-E2B gets 61% of factual questions right from memory. Hand it a couple of
-relevant lines of evidence and it gets 87%. It could always use the fact; it
+Gemma-4-E2B gets 61% of factual questions right from memory. Hand it a short
+block of relevant evidence and it gets 87%. It could always use the fact; it
 just never had room to store it.
 
 That gap is what we're trying to measure and exploit.
@@ -75,9 +79,9 @@ neither line contains the answer alone), made-up answers drop by 3–20×.
 
 However, we found that when a question has **no** true answer, meaning a false
 premise or a detail nobody ever recorded, evidence makes things *worse*.
-Fabrication goes from ~22% to ~37%. Handing a model a page about the right
-person seems to read as permission to answer, even when the page doesn't contain
-the answer.
+Fabrication climbs by half to three-quarters (24% → 41% on the 12B). Handing a
+model a page about the right person seems to read as permission to answer, even
+when the page doesn't contain the answer.
 
 So this fixes questions that have answers. It does not teach a model to say "I
 don't know."
@@ -94,7 +98,7 @@ Ti SUPER was used).
 ### *"The model's knowledge is stale."*
 
 Weights only learn at training time. The corpus is built from public dumps and
-can be rebuilt as often as those dumps land.
+rebuilt as those dumps land.
 
 You update what the model knows by swapping a file, with no retraining and no
 redownloading the model.
@@ -112,24 +116,27 @@ model does and doesn't have access to.
 ### *"Serving is too expensive."*
 
 If a 2B engine with a knowledge file matches a 12B on factual work, you're
-running 6× fewer parameters per token. (Note: we are using a bit of context, as
-the evidence adds a few hundred tokens to each grounded question.)
+running 6× fewer parameters per token. (The evidence does spend context: a
+grounded question carries a few hundred extra prompt tokens.)
 
-The file itself serves from ordinary storage. One copy of the knowledge per cluster, instead of paying for it in every GPU.
+The file itself serves from ordinary storage. One copy of the knowledge per
+cluster, instead of paying for it in every GPU.
 
 ## Who this is for
 
 - **Local runners.** Pair a small model with whatever level fits your disk.
-  179 MB is enough to push a 2B past a 4B's factual accuracy.
+  Through the real lookup, 470 MB lifts a 2B past a 12B's factual accuracy —
+  and the curve is steep at the start, so smaller levels buy most of the
+  benefit.
 - **Edge and embedded.** Engine in silicon, facts in flash, knowledge updated
   over the air without touching the model.
 - **Air-gapped operators.** The knowledge layer crosses the gap as one file you
   can audit, and runs with no network at all.
 - **Fleet operators.** Smaller engines, one shared file mounted per cluster,
   refreshed on whatever schedule you want.
-- **Owners of older models.** Once ballasted, a 4B matches a 12B. Models age
-  much faster in what they know than in what they can do, so an old model may
-  have more life left in it than you'd think.
+- **Owners of older models.** Once both can look things up, a 4B matches a 12B.
+  Models age much faster in what they know than in what they can do, so an old
+  model may have more life left in it than you'd think.
 - **Researchers.** 50k probes, full methodology, caveats documented. Start with
   [THESIS.md](THESIS.md).
 
@@ -141,20 +148,25 @@ what's being offered.
 - **It comes in sizes.** L0 through L7 make knowledge-per-byte a dial, like
   Q4/Q6/Q8. The curve is measured and it's steep at the start: the first 100 MB
   is worth about 14× as much as the last 100 MB. Most of the benefit is cheap.
-- **It's one public file.** Anyone can pin it, cite a version, diff two
-  versions, or rebuild it from the same public dumps. Not a private vector
-  database and an embedding pipeline you have to maintain.
+- **It's one public file.** Anyone can pin it, cite a version, or diff two
+  versions — and once the build tooling ships (see roadmap), rebuild it from
+  the same public dumps. Not a private vector database and an embedding
+  pipeline you have to maintain.
 - **The thing being measured is an exchange rate.** How many bytes of corpus buy
   what a byte of parameters buys, across model sizes and quantization levels.
-  That number (40–100×) is the finding. "Retrieval helps" isn't news.
+  That number (40–100× against full-precision weights, ~15× against the
+  cheapest intact quant) is the finding. "Retrieval helps" isn't news.
 - **We tried to build a better, model-specific version and failed.** Details
   below; it's one of the more useful things we learned.
 
 ## Numbers
 
 Measured on 50,147 factual questions drawn from PopQA, SimpleQA, Natural
-Questions, TriviaQA, and a set we generated ourselves to rule out
-contamination. Full tables and method in [THESIS.md](THESIS.md).
+Questions, TriviaQA, and a set we generated ourselves to sidestep
+contamination. One honest note on protocol: these are 8-way multiple-choice
+scores read from the model's probabilities (no generation, no judge model),
+with an abstain option — open-ended generative use scores lower across the
+board. Full tables, method, and caveats in [THESIS.md](THESIS.md).
 
 | model | on its own | with the full 1.5 GB file | made-up answers, before → after |
 |---|---|---|---|
@@ -176,27 +188,32 @@ Same experiment on a completely unrelated model family:
 | Qwen3.5-4B | 43% | **83%** | 47% → **10%** |
 | Qwen3.5-9B | 54% | 82% | 33% → 11% |
 
-The pattern holds, and gets blunter: the **ballasted 4B beats the ballasted
-9B**. The 0.8B with a 180 MB file overtakes the raw 9B, a jump that costs about
-16 GB of extra weights to buy the normal way. And its rate of making things up
-falls by more than five times.
+The pattern holds, and gets blunter: the **ballasted 4B edges past the
+ballasted 9B** (83% vs 82%). With an ideal lookup, a 180 MB file lifts the
+0.8B past the raw 9B — a jump that costs about 16 GB of extra full-precision
+weights to buy the normal way. (The real-lookup measurement below was done on
+the Gemma family, so we don't quote a realized crossing for Qwen yet.) Either
+way, the 0.8B's rate of making things up falls by more than five times.
 
 ### What it costs to look things up for real
 
-The tables above assume the lookup always finds the right entity. In practically,
-that is hopeful optimism. So we built a caveman one (no embeddings, no model
-calls, just capitalized-phrase matching against a name index) and measured what
-it actually delivers: **about two thirds** of the ideal benefit.
+Headline tables like these usually assume the lookup always finds the right
+entity. In practice, that is hopeful optimism. So we built a caveman one (no
+embeddings, no model calls, just capitalized-phrase matching against a name
+index) and measured what it actually delivers: **about two thirds** of the
+ideal benefit. The crossings quoted at the top of this page — 470 MB to beat
+the raw 12B — already have that real lookup priced in; with an ideal one,
+180 MB would do it.
 
-Interestingly, looking up the *wrong* entity is nearly harmless.
-Feed a model facts about the wrong Douglas Adams and it mostly ignores them. So
-the thing to optimize is finding *something*, not being careful. That's a much
-easier engineering problem.
+Interestingly, looking up the *wrong* entity was nearly harmless in our
+measurements (one model, 1,025 wrong-linked questions). Feed a model facts
+about the wrong Douglas Adams and it mostly ignores them. So the thing to
+optimize is finding *something*, not being careful. That's a much easier
+engineering problem.
 
 With the real lookup in the loop, the headline holds: a 2B with the full file
-beats a 12B on its own, comfortably. The sharper version of the claim, that
-180 MB is enough, needs 470 MB once you account for imperfect lookups. Still
-roughly 40× cheaper than the parameter route.
+beats a 12B on its own, comfortably — still roughly 40× cheaper per byte than
+the full-precision parameter route, ~15× against the quantized one.
 
 ### If you run quantized models, this part is for you
 
@@ -246,8 +263,8 @@ The obvious next idea: instead of one corpus for everybody, build each model a
 corpus of the facts *it personally* doesn't know. We built the machinery. It
 works, in the sense that we can predict a given model's blind spots from the
 corpus alone with decent accuracy, and different model families genuinely do
-have different blind spots (models from the same family miss the same facts;
-models from different families don't).
+have different blind spots (models from the same family miss largely the same
+facts; models from different families overlap far less).
 
 It lost anyway. At every size, the plain generic corpus beat the personalized
 one, decisively.
@@ -258,26 +275,9 @@ can tell you the first. It cannot tell you the second, which is a property of
 the people asking, not of the data. Personalized selection spent its budget on
 obscure facts the model didn't know and nobody asks about, while dropping common
 facts it also didn't know. When we cheated and used the actual questions to
-select, 0.9 MB outperformed the generic 1.5 GB corpus. So the ceiling is real.
-It just isn't reachable from the corpus side.
-
-## Hardware this ran on
-
-**Build and evaluation box.** All benchmark numbers in this README were
-produced here.
-
-| | |
-|---|---|
-| GPU | NVIDIA RTX PRO 4500 Blackwell, 32 GB VRAM |
-| CPU | Intel Core i9-12900K, 16 cores / 24 threads |
-
-**Demo and live-replication machine.** The end-to-end demo, the one where a
-model answers questions through the corpus, runs on ordinary gaming hardware.
-
-| | |
-|---|---|
-| GPU | NVIDIA GeForce RTX 4070 Ti SUPER, 16 GB VRAM |
-| CPU | AMD Ryzen 7 7800X3D, 8 cores / 16 threads |
+select, 0.9 MB closed twice the model-to-model gap that 107 MB of generic
+corpus closed. So the ceiling is real. It just isn't reachable from the corpus
+side.
 
 ## Get it
 

@@ -1,6 +1,6 @@
 # Ballast: Quantize the Weights, Ballast the Knowledge
 
-*OpenBallast — working notes, v0.1 (July 2026). Numbers below are measured, not projected; the experiment matrix is still running and this document will be updated as verdicts land.*
+*OpenBallast — working notes, v0.2 (August 2026). Numbers below are measured, not projected; the experiment matrix is still running and this document will be updated as verdicts land.*
 
 ---
 
@@ -14,11 +14,11 @@ The community's verdict on small models ("brain damaged," "unusable") is mostly 
 
 So the claim: knowledge should ship as a **separate, versioned, compressed, quantizable artifact** — a *ballast* — that any model loads next to its weights:
 
-- **~100× cheaper per fact than parameters** (measured below),
-- stored in flash/RAM instead of VRAM (~1000× cheaper medium),
+- **~40–100× cheaper per fact than full-precision parameters** (measured below; ~40× with the measured real-world linker, §4.7, and ~15× if the larger model is charged at its cheapest intact quant, §4.2),
+- stored in flash/RAM instead of VRAM (~1000× cheaper medium at rest; retrieved evidence still spends context tokens at inference, §4.7),
 - updateable monthly without retraining anything,
-- quantizable in nested levels exactly like weight quants (pick your L2 like you pick your Q4),
-- CC0, reproducible from public dumps by anyone.
+- quantizable in nested levels like weight quants (pick your L2 like you pick your Q4 — with the caveat that levels truncate the tail rather than reduce precision, §2),
+- CC0, rebuilt from public dumps (build tooling to be open-sourced — §6).
 
 One sentence: **quantize the weights, ballast the knowledge.**
 
@@ -56,8 +56,9 @@ What this project adds is artifact discipline on top of that literature: the
 datastore as a *versioned, CC0, standalone release* rather than a lab-internal
 index; nested rank-bucket **levels** that make knowledge/bytes a user-facing
 knob analogous to weight quants; a measured **corpus-bytes vs parameter-bytes
-exchange rate** on one probe set across model sizes and weight quants; and
-per-model **tuned ballasts** selected by a competence model. The numbers below
+exchange rate** on one probe set across model sizes and weight quants; and a
+measured verdict on per-model **tuned ballasts** selected by a competence model
+(negative — generic selection wins at equal bytes, §4.8). The numbers below
 measure those additions, not retrieval augmentation per se.
 
 ## 2. The artifact
@@ -149,14 +150,18 @@ The pattern replicates across an unrelated family, and sharpens: raw floors
 spread 0.32–0.54 while grounded ceilings land in a 0.77–0.83 band — and the
 **ballasted 4B beats the ballasted 9B outright** (0.831 vs 0.819). Crossings:
 0.8B + 62 MB (L1) exceeds the 4B raw (0.443 vs 0.434); 0.8B + 180 MB (L3)
-exceeds the 9B raw (0.552 vs 0.542) — the parameter route to that gain is
-~16 GB of weights, a ~90× byte disadvantage. The 0.8B's hallucination rate
+exceeds the 9B raw (0.552 vs 0.542) — both at ideal entity resolution (§4.7;
+the realization band was measured on the Gemma family) and on margins of
+~0.01. The parameter route to that gain is ~16 GB of bf16 weights, a ~90×
+byte disadvantage. The 0.8B's hallucination rate
 falls more than 5× (0.601 → 0.114). Families do differ in grounded ceiling
 (Gemma ~0.91 vs Qwen ~0.82 on the same evidence) — reading ability varies
 across lineages — but the within-family structure (floors spread, ceilings
 compress, head-heavy value-per-byte) is identical.
 
 ### 4.2 Equal-bytes crossings — the headline
+
+*(Ideal entity resolution; the realized band is §4.7.)*
 
 | comparison | corpus route | parameter route | byte advantage |
 |---|---|---|---|
@@ -167,13 +172,23 @@ compress, head-heavy value-per-byte) is identical.
 
 *Each solid line is one model spending additional bytes on corpus; the dashed line is the same budget spent on parameters instead. Corpus spend is near-vertical at this scale — the crossings in the table are visible as each small model's line climbing past the larger models' starting points.*
 
+Pricing note: the parameter route above is charged at bf16. §4.6 shows the 12B
+rides Q4_K_M nearly intact (raw 0.673 vs 0.683), so the cheapest honest
+parameter route is ~7.3 GB on disk — against which the full-corpus advantage
+is roughly 15× at the realized retrieval floor (§4.7). The 40–100× figures
+hold against full-precision weights; both pricings are stated so the
+comparison never rests on the flattering one.
+
 ### 4.3 Rate–distortion is smooth and concave
 
 Marginal value per gigabyte falls ~14× from the head of the corpus to the tail (E2B: 0.71 accuracy-points/GB at L1 → 0.05 at L7), with the same shape across model sizes. Truncation is a real quality knob — graceful degradation, no cliff — which is what makes corpus quantization levels meaningful.
 
 ### 4.4 The boundary is predictable (boost precondition)
 
-Competence models hit **AUC 0.774 (E2B), 0.807 (E4B), 0.807 (12B)** on held-out subjects against a 0.58 gate — each model's knowledge holes are strongly predictable from corpus-native features alone. Model-aware tuned ballasts therefore have signal to exploit; gap-closed verdicts are in the running matrix.
+Competence models hit **AUC 0.774 (E2B), 0.807 (E4B), 0.807 (12B)** on held-out subjects against a 0.58 gate — each model's knowledge holes are strongly predictable from corpus-native features alone. Model-aware tuned ballasts therefore have signal
+to exploit — yet the measured verdict (§4.8) is that selection built on this
+signal loses to the generic prefix at equal bytes: predictable ignorance
+without demand-awareness is not enough.
 
 ### 4.5 Live replication
 
@@ -269,7 +284,9 @@ realization, E2B + the full 1.51 GB ballast lands at ≈0.77 end-to-end against
 the 12B's raw 0.683 — the full-corpus crossing holds comfortably. The sharper
 oracle claim "E2B + 180 MB beats the 12B raw" moves to **E2B + ~470 MB (L5)**
 at the realized floor (L3 composes to ≈0.67, just under; L5 to ≈0.71). The
-byte advantage versus the ~19.4 GB parameter route remains ~40×. Two further
+byte advantage versus the ~19.4 GB bf16 parameter route remains ~40× — ~15×
+if the 12B is instead charged at Q4_K_M, the cheapest quant that leaves it
+intact (§4.6). Two further
 qualifications, in opposite directions: the probe setting — mining mentions
 from raw natural-language trivia — is close to worst-case retrieval, and the
 agent path (the model calls `resolve("Douglas Adams")` with a clean mention,
