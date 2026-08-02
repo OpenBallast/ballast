@@ -262,6 +262,37 @@ The hosted endpoint is a demo. It runs on Cloudflare Free Tier that you can host
 - [docs/artifact.md](docs/artifact.md): what's in the corpus and how to load it
 - [docs/mcp.md](docs/mcp.md): demo endpoint reference
 
+## Roadmap
+
+- **More corpora on Hugging Face.** T0 is Wikidata triples, so anything that
+  isn't a structured fact is currently missing. Next up: encyclopedia prose,
+  open textbooks for the explanatory and procedural knowledge triples can't
+  hold, non-English builds, and domain sets.
+- **License as a first-class knob.** CC0 was the right MVP choice because it has
+  no strings at all. Most other good sources come with terms (share-alike,
+  attribution, non-commercial), and mixing them into one blob makes the whole
+  thing unusable for somebody. Licenses are tracked per record, and you'll be
+  able to say what you're willing to accept at download time, for example
+  "commercial use only, no share-alike," and get an artifact that satisfies it.
+- **Bring your own corpus.** The format and the loader contract get published so
+  anyone can turn their own documents, or their national statistics office, into
+  a ballast without waiting for us.
+- **Better lookups.** The current one delivers about two thirds of what perfect
+  lookup would. Closing that gap is ordinary engineering and it lifts every
+  number above it.
+- **Knowing when there's no answer.** The fabrication result is the clearest
+  open problem here: the system needs to tell the model when the evidence
+  doesn't contain an answer, instead of handing over a page and hoping.
+- **Multi-hop questions.** Questions that need two facts joined together already
+  work when the evidence is handed over whole. Doing that lookup automatically
+  needs a query planner, which the data supports and the software doesn't yet.
+- **Staying current.** Right now a refresh means rebuilding. Incremental updates
+  are the goal, so a new build is a small patch rather than a new download.
+- **Checking output, not just feeding input.** Same corpus, opposite direction:
+  take what a model wrote and flag the claims the corpus doesn't support.
+- **A citable release.** A pinned version with a DOI, so results can be
+  referenced and reproduced against exactly the bytes they were measured on.
+
 ## Status
 
 Research phase, published as it lands. Done: two model families end to end, the
