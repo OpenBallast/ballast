@@ -122,7 +122,7 @@ Beyond the generic level prefix, a **competence model** per (model, quant) cell 
 
 ### 3.5 Beyond recall
 
-A second probe family tests whether ballast reduces hallucination when copy-extraction cannot work: 2-hop composition chains whose answer appears only via a join (with an adversarial subset where the competing join path's answer is also present in evidence — distractor-in-context stress in the spirit of Shi et al., 2023), unanswerable/false-premise probes where every candidate is false (fabrication = any confident pick; the unanswerable-question design follows SQuAD 2.0, Rajpurkar et al., 2018, and false-premise framing follows FreshQA, Vu et al., 2023), 2WikiMultiHopQA (Ho et al., 2020), and TruthfulQA MC1 (Lin et al., 2022) as a falsification control — misconception-driven questions that grounding should *not* improve; if it does, gains are prompt artifact. Verdicts pending (in the running matrix).
+A second probe family tests whether ballast reduces hallucination when copy-extraction cannot work: 2-hop composition chains whose answer appears only via a join (with an adversarial subset where the competing join path's answer is also present in evidence — distractor-in-context stress in the spirit of Shi et al., 2023), unanswerable/false-premise probes where every candidate is false (fabrication = any confident pick; the unanswerable-question design follows SQuAD 2.0, Rajpurkar et al., 2018, and false-premise framing follows FreshQA, Vu et al., 2023), 2WikiMultiHopQA (Ho et al., 2020), and TruthfulQA MC1 (Lin et al., 2022) as a falsification control — misconception-driven questions that grounding should *not* improve; if it does, gains are prompt artifact. Verdicts: §4.10.
 
 ## 4. Numbers so far
 
@@ -258,7 +258,7 @@ of it, and the remaining gap is an engineering ladder (typed disambiguation,
 retrieval-quality levels R0–R7) with a per-rung measurement in place — not an
 assumption.
 
-### 4.7 Model-aware selection: a negative result with a measured ceiling
+### 4.8 Model-aware selection: a negative result with a measured ceiling
 
 The boost design (§3.4) asked whether a corpus selected for a specific model
 beats the generic notability prefix at equal bytes. For the E2B→E4B pair, it
@@ -278,7 +278,7 @@ The failure mechanism is visible in the coverage column: at L0 the tuned
 selection grounds 1.5% of probe subjects against the generic prefix's 20.4%.
 Every ingredient of tuned selection works in isolation — competence models
 pass their gates on every cell (AUC 0.66–0.81, §4.4), and miss-sets are
-genuinely model-specific (§4.8) — but the selection objective is *expected
+genuinely model-specific (§4.9) — but the selection objective is *expected
 query mass × predicted ignorance*, and corpus-native features estimate only
 the second factor. Predicted ignorance concentrates in the deep tail, where
 per-entity query mass is smallest; buying it evicts head entities that the
@@ -295,7 +295,7 @@ Scope note: this verdict is relative to the benchmark-derived query
 distribution of the probe set. A query distribution concentrated in the deep
 tail would shift the comparison; the oracle row bounds how much.
 
-### 4.8 Miss-set overlap: knowledge holes are lineage-specific
+### 4.9 Miss-set overlap: knowledge holes are lineage-specific
 
 Cohen's κ between miss indicators (beyond accuracy-marginal chance), 41,381
 shared probes:
@@ -311,10 +311,61 @@ shared probes:
   independent signature of the §4.6 cliff (after the raw floor and the
   grounded ceiling).
 
-Together with §4.7 these two results form a consistent picture: holes are
+Together with §4.8 these two results form a consistent picture: holes are
 model-specific and predictable, yet a single generic corpus serves every
 model measured here better than corpora tuned to each — because the generic
 ranking already approximates the one quantity tuning cannot observe.
+
+### 4.10 Hallucination beyond recall: composition falls, fabrication rises
+
+The §3.5 probe families, run over seven (model, quant) cells (E2B/E4B/12B at
+bf16; E4B/12B at fp8 and nf4), 43,137 probes per cell, logprob MC with the
+abstention triad at threshold 0.5. Hallucination rate = wrong answers per
+attempt; each family read at every corpus cutoff (dose–response, as §4.6).
+
+**Composition (hop2, adversarial hop2, 2WikiMultiHopQA): PASS in all 21
+family×cell readings.** Where copy-extraction cannot work — the answer exists
+only through a join across two evidence lines — grounding still collapses
+hallucination: hop2 0.34–0.49 ungrounded → 0.006–0.24 at full corpus;
+2WikiMultiHopQA 0.42–0.67 → 0.08–0.42. The adversarial subset (the competing
+join path's answer is also present in evidence, distractor-in-context in the
+spirit of Shi et al., 2023) costs a few points but does not change the
+verdict (12B bf16: 0.42 → 0.05). The fall is monotone in corpus level in
+every cell — a dose–response curve, not an endpoint artifact. E4B@nf4 is
+again the weakest cell (adversarial 0.61 → 0.44; 2WikiMultiHopQA 0.67 →
+0.42): a fourth appearance of the §4.6 cliff signature, now in hallucination
+rather than recall.
+
+**Unanswerable/false-premise: FAIL in all 7 cells — fabrication *rises* with
+grounding.** Every candidate answer to these probes is false; any confident
+pick is a fabrication. Ungrounded, models abstain often (fabrication
+0.18–0.27). With evidence present, fabrication climbs — monotonically with
+coverage, roughly linearly (12B bf16: 0.243 ungrounded → 0.256 at L0 → 0.406
+at full corpus; +0.09 to +0.18 across cells). The mechanism is abstention
+suppression: an evidence block that mentions the question's entities — while
+containing no answer, because none exists — reads as license to answer.
+Grounding transfers trust from the model's calibration to the context, and
+that transfer is indiscriminate: it suppresses exactly the abstentions that
+were correct. This is the retrieval-augmentation failure mode Shi et al.
+(2023) observe for irrelevant context, appearing here for *relevant but
+non-answering* context, and it is the strongest argument measured so far
+that evidence injection needs an answerability signal (or verifier pass) —
+already noted as out of scope for v1 in §6.
+
+**TruthfulQA control: imperfect.** The control demands |Δ| ≤ 0.02 under
+grounding; 3 of 7 cells pass, 4 move by +0.03 to −0.07 (coverage 0.56 — half
+the items link to corpus entities). The sign is inconsistent across cells, so
+this is not a systematic prompt artifact inflating the headline results, but
+the control cannot certify them either at the 2% margin: evidence injection
+measurably perturbs behavior on misconception-style questions. Read the
+composition PASSes with that grain of salt; the unanswerable FAIL needs no
+control (it is a negative result against the intervention).
+
+The pairing is the finding: the same evidence block that cuts multi-hop
+hallucination by 3–20× also *raises* unsupported-answer rate by half to
+three-quarters when no true answer exists. Grounding, as implemented here, is
+not a hallucination fix — it is a trade of one failure mode against another,
+strongly favorable only when questions have answers.
 
 ## 5. Honest caveats
 
@@ -326,13 +377,20 @@ ranking already approximates the one quantity tuning cannot observe.
 - **Abstention-thresholded metrics**: raw forced-choice gaps are smaller than triad numbers.
 - **Contamination**: models have seen Wikipedia/Wikidata in pretraining. The self-generated benchmark is uncontaminated by construction; external sets serve as robustness checks; and the interesting quantity (grounded − ungrounded delta) is contamination-*conservative* — pretraining exposure inflates the raw floor, not the gain.
 - **Generative grading** (demo bench) is weaker than logprob scoring — demo readout, not measurement.
+- **Grounding suppresses correct abstention**: on unanswerable probes,
+  fabrication rises monotonically with corpus coverage (§4.10). Evidence
+  injection without an answerability signal trades multi-hop hallucination
+  for false-premise fabrication.
+- **The TruthfulQA control is not clean**: 4 of 7 cells move beyond the 2%
+  margin (±0.03–0.07, inconsistent sign) under grounding (§4.10).
 - Facts absent from Wikidata are absent from the ballast; T0 measures the triple-shaped slice of knowledge.
 
 ## 6. What's running now / next
 
-- Boost verdicts for the remaining arms: E2B→31B, and the **quant-damage buyback** arm (12B Q4_K_M → Q6_K: what fraction of quantization's knowledge loss does targeted ballast recover, per MB). (E2B→E4B: measured, §4.7.)
-- Hallucination-beyond-recall verdicts (composition, fabrication, control).
-- Gemma-4-31B; cross-family miss-set overlap — if families miss *different* facts, a shared ballast is worth more than either family's tuning. (Qwen3.5 ladder: done, §4.1b.)
+- Boost verdicts for the remaining arms: E2B→31B, and the **quant-damage buyback** arm (12B Q4_K_M → Q6_K: what fraction of quantization's knowledge loss does targeted ballast recover, per MB). (E2B→E4B: measured, §4.8.)
+- Hallucination-beyond-recall GGUF cells (Q6_K / Q4_K_M — does integer
+  quantization move the §4.10 curves). (bf16/fp8/nf4 cells: done, §4.10.)
+- Gemma-4-31B; cross-family miss-set overlap — if families miss *different* facts, a shared ballast is worth more than either family's tuning. (Qwen3.5 ladder: done, §4.1b. Overlap: done, §4.9.)
 - Legacy revival cells (Mistral-7B-class): grounding as a generation equalizer.
 - Tooling for third parties to build and tune their own ballasts (to be open-sourced separately).
 
