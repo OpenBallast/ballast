@@ -223,6 +223,39 @@ facts it also didn't know. When we cheated and used the actual questions to
 select, 0.9 MB outperformed the generic 1.5 GB corpus. So the ceiling is real.
 It just isn't reachable from the corpus side.
 
+## Hardware this ran on
+
+No cluster, no rented A100s. Two desktops and a free-tier CDN account.
+
+**Build and evaluation box.** Every number in this README was produced here.
+
+| | |
+|---|---|
+| GPU | NVIDIA RTX PRO 4500 Blackwell, 32 GB VRAM (driver 610.43.02, CUDA 13.3) |
+| CPU | Intel Core i9-12900K, 16 cores / 24 threads |
+| RAM | 32 GB, plus 147 GB of swap |
+| Storage | Samsung 980 PRO 2 TB NVMe |
+| OS | Ubuntu 24.04.4 LTS, kernel 6.8 |
+
+The 32 GB of RAM is the real constraint, not the GPU. Parsing a full Wikidata
+dump, building the corpus, and quantizing model weights all want more memory
+than that, which is why the swap is oversized and why several build steps run
+under memory limits that force them to stream instead of loading everything at
+once.
+
+**Demo and live-replication machine.** The end-to-end demo, the one where a
+model answers questions through the corpus, runs on ordinary gaming hardware.
+
+| | |
+|---|---|
+| GPU | NVIDIA GeForce RTX 4070 Ti SUPER, 16 GB VRAM |
+| CPU | AMD Ryzen 7 7800X3D, 8 cores / 16 threads |
+| RAM | 64 GB |
+
+**Hosting.** The public endpoint runs entirely on Cloudflare's free tier, which
+you can reproduce yourself for $0. The corpus files are served from Hugging
+Face.
+
 ## Get it
 
 | what | where |
