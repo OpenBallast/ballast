@@ -230,12 +230,12 @@ It just isn't reachable from the corpus side.
 Against a local Ollama. This is the whole setup:
 
 ```bash
-uvx --from git+https://github.com/OpenBallast/ballast-cli openballast pull --level 3
-uvx --from git+https://github.com/OpenBallast/ballast-cli openballast serve
+uvx openballast pull --level 3
+uvx openballast serve
 # point your client at http://localhost:11435/v1 instead of :11434, and that's it
 ```
 
-(PyPI package coming; it becomes just `uvx openballast`.)
+(Or `pip install openballast`. Source: [github.com/OpenBallast/ballast-cli](https://github.com/OpenBallast/ballast-cli).)
 
 First live A/B on a 0.5B model, asked "Where was Douglas Adams born?" On its
 own: *Dublin*. Through the proxy: *Cambridge*.
