@@ -223,6 +223,23 @@ Practical consequence: at 4-bit the smaller Gemma is the better model once
 ballasted (84% vs 65%), which reverses the usual ordering. And a 4-bit 2B plus
 the entire corpus, under 3 GB all in, beats the full-precision 12B on ~24 GB.
 
+The table above is bitsandbytes nf4. The formats people actually download, the
+GGUF K-quants, behave the same way. On the two models we swept across GGUF
+levels:
+
+| at GGUF quant | Q6_K | Q4_K_M |
+|---|---|---|
+| Gemma-4-E4B | 66% / 91% (intact) | 50% / 72% (**broken**) |
+| Gemma-4-12B | 68% / 91% | 67% / 91% |
+
+(raw / with the full file.) Q6_K was free on every model we measured, identical
+to full precision. Q4_K_M broke the same model nf4 breaks and left the other
+untouched. So the cliff for a fragile model sits between 6-bit and 4-bit, it
+follows the model rather than the quantization method, and accuracy *with*
+evidence is still the test that tells you which case you have.
+
+![Chart: raw and ballasted accuracy across bf16, fp8, Q6_K, Q4_K_M and nf4. The 12B lines are flat everywhere; the E4B lines plunge between Q6_K and the two 4-bit formats.](assets/figures/quant_cliff.png)
+
 ### The thing that didn't work
 
 The obvious next idea: instead of one corpus for everybody, build each model a
@@ -321,9 +338,10 @@ host your own for $0. The real downloads live on Hugging Face.
 ## Status
 
 Research phase, published as it lands. Done: two model families end to end, the
-quantization sweep, the real-lookup measurement, the personalized-corpus attempt
-(which failed, informatively), and the hallucination experiments. Still running:
-GGUF quantizations and models above 12B. We intend to keep profiling
+full quantization sweep on the pivots (bf16, fp8, GGUF Q6_K and Q4_K_M, nf4),
+the real-lookup measurement, the personalized-corpus attempt (which failed,
+informatively), and the hallucination experiments. Still running: models above
+12B and their quant ladders. We intend to keep profiling
 state-of-the-art open-source models as they come out. Tooling for building your
 own corpus will be open-sourced separately.
 
