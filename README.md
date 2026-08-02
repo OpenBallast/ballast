@@ -306,11 +306,11 @@ The hosted endpoint is a demo. It runs on Cloudflare Free Tier that you can host
 - **More corpora on Hugging Face.** T0 is Wikidata triples, so anything that
   isn't a structured fact is currently missing. Next up: encyclopedia prose,
   open textbooks for the explanatory and procedural knowledge triples can't
-  hold, non-English builds, and domain sets.
-- **License as a first-class knob.** CC0 was the right MVP choice because it has
-  no strings at all. Most other good sources come with terms (share-alike,
-  attribution, non-commercial), and mixing them into one blob makes the whole
-  thing unusable for somebody. Licenses are tracked per record, and you'll be
+  hold.
+- **License as a first-class knob.** CC0 was the first choice of corpus because it has
+  no strings attached. Most other good sources come with terms (share-alike,
+  attribution, non-commercial), and mixing them into one blob may make the whole thing unusable.
+  Licenses are tracked per record, and you'll be
   able to say what you're willing to accept at download time, for example
   "commercial use only, no share-alike," and get an artifact that satisfies it.
 - **Bring your own corpus.** The format and the loader contract get published so
