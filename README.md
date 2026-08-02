@@ -53,46 +53,68 @@ disk, not in VRAM.
 
 ## Problems we're trying to address
 
-**"Small models are dumb."** Not exactly. They're *ignorant*. Gemma-4-E2B gets
-61% of factual questions right from memory. Hand it a couple of relevant lines
-of evidence and it gets 87%. It could always use the fact; it just never had
-room to store it. That gap is what we're trying to measure and exploit.
+> ### "Small models are dumb."
 
-**"It makes things up."** Attaching the corpus cuts hallucination on that same
-model from 24% to 7%. It isn't just copying answers out of the text either. On
-questions that require chaining two facts together (*"where was the director of
-this film born?"*, where neither line contains the answer alone), made-up
-answers drop by 3–20×.
+Not exactly. They're *ignorant*.
 
-However we found that when a question has **no** true answer, 
-meaning a false premise or a detail nobody ever recorded,
-evidence makes things *worse*. Fabrication goes from ~22% to ~37%. Handing a
-model a page about the right person seems to read as permission to answer, even
-when the page doesn't contain the answer. So this fixes questions that have
-answers. It does not teach a model to say "I don't know."
+Gemma-4-E2B gets 61% of factual questions right from memory. Hand it a couple of
+relevant lines of evidence and it gets 87%. It could always use the fact; it
+just never had room to store it.
 
-**"My GPU only has 8/12/16 GB."** Every gigabyte of weights spent memorizing
-obscure facts is a gigabyte not spent on context or a better engine.
-Ballast moves those facts to disk, where they're cheap. The whole demo, two
-models plus lookups, runs on one 16 GB desktop card (a 4070 TI Super was used).
+That gap is what we're trying to measure and exploit.
 
-**"The model's knowledge is stale."** Weights only learn at training time. The
-corpus is built from public dumps and can be rebuilt as often as those dumps
-land. You update what the model knows by swapping a file, with
-no retraining and no redownloading the model.
+> ### "It makes things up."
 
-**"We can't send data to anyone's API."** Every common fix for hallucination
-(web search, hosted RAG, embedding APIs) needs a network connection. This is a
-static file. Copy it across the air gap once and the knowledge layer works
-offline, forever. Useful for defense, healthcare, ships, factory floors, and
-anywhere data isn't allowed to leave. It's also one versioned file, so you can
-say exactly what the model does and doesn't have access to.
+Attaching the corpus cuts hallucination on that same model from **24% to 7%**.
 
-**"Serving is too expensive."** If a 2B engine with a knowledge file matches a
-12B on factual work, you're running 6× fewer parameters per token. (Note: We are
-using a bit of context as the evidence adds a few hundred tokens to each grounded question.) The
-file itself serves from ordinary storage; our demo endpoint costs $0/month. One
-copy of the knowledge per cluster, instead of paying for it in every GPU.
+It isn't just copying answers out of the text, either. On questions that need
+two facts chained together (*"where was the director of this film born?"*, where
+neither line contains the answer alone), made-up answers drop by 3–20×.
+
+However, we found that when a question has **no** true answer, meaning a false
+premise or a detail nobody ever recorded, evidence makes things *worse*.
+Fabrication goes from ~22% to ~37%. Handing a model a page about the right
+person seems to read as permission to answer, even when the page doesn't contain
+the answer.
+
+So this fixes questions that have answers. It does not teach a model to say "I
+don't know."
+
+> ### "My GPU only has 8/12/16 GB."
+
+Every gigabyte of weights spent memorizing obscure facts is a gigabyte not spent
+on context or a better engine. Ballast moves those facts to disk, where they're
+cheap.
+
+The whole demo, two models plus lookups, runs on one 16 GB desktop card (a 4070
+Ti SUPER was used).
+
+> ### "The model's knowledge is stale."
+
+Weights only learn at training time. The corpus is built from public dumps and
+can be rebuilt as often as those dumps land.
+
+You update what the model knows by swapping a file, with no retraining and no
+redownloading the model.
+
+> ### "We can't send data to anyone's API."
+
+Every common fix for hallucination (web search, hosted RAG, embedding APIs)
+needs a network connection. This is a static file. Copy it across the air gap
+once and the knowledge layer works offline, forever.
+
+Useful for defense, healthcare, ships, factory floors, and anywhere data isn't
+allowed to leave. It's also one versioned file, so you can say exactly what the
+model does and doesn't have access to.
+
+> ### "Serving is too expensive."
+
+If a 2B engine with a knowledge file matches a 12B on factual work, you're
+running 6× fewer parameters per token. (Note: we are using a bit of context, as
+the evidence adds a few hundred tokens to each grounded question.)
+
+The file itself serves from ordinary storage; our demo endpoint costs $0/month.
+One copy of the knowledge per cluster, instead of paying for it in every GPU.
 
 ## Who this is for
 
@@ -141,8 +163,10 @@ contamination. Full tables and method in [THESIS.md](THESIS.md).
 
 The interesting part is the shape. On their own the three models are spread
 apart, and that spread is the memorization gap. Once all three can look things
-up, they land in the same place. What separates a 2B from a 12B, factually, is
-mostly what it memorized, and that part can be bought back cheaply.
+up, they land in the same place.
+
+> What separates a 2B from a 12B, factually, is mostly what it memorized, and
+> that part can be bought back cheaply.
 
 Same experiment on a completely unrelated model family:
 
@@ -153,10 +177,13 @@ Same experiment on a completely unrelated model family:
 | Qwen3.5-4B | 43% | **83%** | 47% → **10%** |
 | Qwen3.5-9B | 54% | 82% | 33% → 11% |
 
-The pattern holds, and gets blunter: the **ballasted 4B beats the ballasted
-9B**. The 0.8B with a 180 MB file overtakes the raw 9B, a jump that costs about
-16 GB of extra weights to buy the normal way. And its rate of making things up
-falls by more than five times.
+The pattern holds, and gets blunter.
+
+> The ballasted 4B beats the ballasted 9B outright.
+
+The 0.8B with a 180 MB file overtakes the raw 9B, a jump that costs about 16 GB
+of extra weights to buy the normal way. And its rate of making things up falls
+by more than five times.
 
 ### What it costs to look things up for real
 
@@ -166,9 +193,10 @@ calls, just capitalized-phrase matching against a name index) and measured what
 it actually delivers: **about two thirds** of the ideal benefit.
 
 One surprise worth knowing: looking up the *wrong* entity is nearly harmless.
-Feed a model facts about the wrong Douglas Adams and it mostly ignores them. So
-the thing to optimize is finding *something*, not being careful. That's a much
-easier engineering problem.
+Feed a model facts about the wrong Douglas Adams and it mostly ignores them.
+
+> The thing to optimize is finding *something*, not being careful. That's a much
+> easier engineering problem.
 
 With the real lookup in the loop, the headline holds: a 2B with the full file
 beats a 12B on its own, comfortably. The sharper version of the claim, that
@@ -190,13 +218,15 @@ it isn't about size:
 models, and you can't guess which from the parameter count. The middle model
 here is the one that breaks.
 
-What ballast adds is a way to tell them apart. When a model is merely *forgetful*
-after quantization, the file gives the knowledge back. When quantization has
-damaged its ability to read and follow evidence, the score stays low no matter
-how much corpus you hand it. That is what a broken model looks like, and its
-accuracy *with* evidence is what's interesting.
+What ballast adds is a way to tell them apart. When a model is merely
+*forgetful* after quantization, the file gives the knowledge back. When
+quantization has damaged its ability to read and follow evidence, the score
+stays low no matter how much corpus you hand it.
 
-Practical consequence: at 4-bit the smaller Gemma is the better model once
+> Accuracy *with* evidence is what separates a forgetful model from a broken
+> one.
+
+Two practical consequences. At 4-bit the smaller Gemma is the better model once
 ballasted (84% vs 65%), which reverses the usual ordering. And a 4-bit 2B plus
 the entire corpus, under 3 GB all in, beats the full-precision 12B on ~24 GB.
 
@@ -205,23 +235,27 @@ We intend to continue profiling state of the art open source models as they come
 ### The thing that didn't work
 
 The obvious next idea: instead of one corpus for everybody, build each model a
-corpus of the facts *it personally* doesn't know. We built the machinery. It
-works, in the sense that we can predict a given model's blind spots from the
-corpus alone with decent accuracy, and different model families genuinely do
-have different blind spots (models from the same family miss the same facts;
-models from different families don't).
+corpus of the facts *it personally* doesn't know.
+
+We built the machinery, and the parts work. We can predict a given model's blind
+spots from the corpus alone with decent accuracy, and different model families
+genuinely do have different blind spots (models from the same family miss the
+same facts; models from different families don't).
 
 It lost anyway. At every size, the plain generic corpus beat the personalized
 one, decisively.
 
 The reason is the useful part. Picking facts for a model needs two things: which
-facts it doesn't know, and which facts someone is going to ask about. The corpus
-can tell you the first. It cannot tell you the second, which is a property of
-the people asking, not of the data. Personalized selection spent its budget on
-obscure facts the model didn't know and nobody asks about, while dropping common
-facts it also didn't know. When we cheated and used the actual questions to
-select, 0.9 MB outperformed the generic 1.5 GB corpus. So the ceiling is real.
-It just isn't reachable from the corpus side.
+facts it doesn't know, and which facts someone is going to ask about.
+
+> The corpus can tell you the first. It cannot tell you the second, which is a
+> property of the people asking, not of the data.
+
+Personalized selection spent its budget on obscure facts the model didn't know
+and nobody asks about, while dropping common facts it also didn't know. When we
+cheated and used the actual questions to select, 0.9 MB outperformed the generic
+1.5 GB corpus. So the ceiling is real. It just isn't reachable from the corpus
+side.
 
 ## Hardware this ran on
 
