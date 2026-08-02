@@ -163,10 +163,8 @@ contamination. Full tables and method in [THESIS.md](THESIS.md).
 
 The interesting part is the shape. On their own the three models are spread
 apart, and that spread is the memorization gap. Once all three can look things
-up, they land in the same place.
-
-> What separates a 2B from a 12B, factually, is mostly what it memorized, and
-> that part can be bought back cheaply.
+up, they land in the same place. What separates a 2B from a 12B, factually, is
+mostly what it memorized, and that part can be bought back cheaply.
 
 Same experiment on a completely unrelated model family:
 
@@ -177,13 +175,10 @@ Same experiment on a completely unrelated model family:
 | Qwen3.5-4B | 43% | **83%** | 47% → **10%** |
 | Qwen3.5-9B | 54% | 82% | 33% → 11% |
 
-The pattern holds, and gets blunter.
-
-> The ballasted 4B beats the ballasted 9B outright.
-
-The 0.8B with a 180 MB file overtakes the raw 9B, a jump that costs about 16 GB
-of extra weights to buy the normal way. And its rate of making things up falls
-by more than five times.
+The pattern holds, and gets blunter: the **ballasted 4B beats the ballasted
+9B**. The 0.8B with a 180 MB file overtakes the raw 9B, a jump that costs about
+16 GB of extra weights to buy the normal way. And its rate of making things up
+falls by more than five times.
 
 ### What it costs to look things up for real
 
@@ -193,10 +188,9 @@ calls, just capitalized-phrase matching against a name index) and measured what
 it actually delivers: **about two thirds** of the ideal benefit.
 
 One surprise worth knowing: looking up the *wrong* entity is nearly harmless.
-Feed a model facts about the wrong Douglas Adams and it mostly ignores them.
-
-> The thing to optimize is finding *something*, not being careful. That's a much
-> easier engineering problem.
+Feed a model facts about the wrong Douglas Adams and it mostly ignores them. So
+the thing to optimize is finding *something*, not being careful. That's a much
+easier engineering problem.
 
 With the real lookup in the loop, the headline holds: a 2B with the full file
 beats a 12B on its own, comfortably. The sharper version of the claim, that
@@ -218,15 +212,13 @@ it isn't about size:
 models, and you can't guess which from the parameter count. The middle model
 here is the one that breaks.
 
-What ballast adds is a way to tell them apart. When a model is merely
-*forgetful* after quantization, the file gives the knowledge back. When
-quantization has damaged its ability to read and follow evidence, the score
-stays low no matter how much corpus you hand it.
+What ballast adds is a way to tell them apart. When a model is merely *forgetful*
+after quantization, the file gives the knowledge back. When quantization has
+damaged its ability to read and follow evidence, the score stays low no matter
+how much corpus you hand it. That is what a broken model looks like, and its
+accuracy *with* evidence is what's interesting.
 
-> Accuracy *with* evidence is what separates a forgetful model from a broken
-> one.
-
-Two practical consequences. At 4-bit the smaller Gemma is the better model once
+Practical consequence: at 4-bit the smaller Gemma is the better model once
 ballasted (84% vs 65%), which reverses the usual ordering. And a 4-bit 2B plus
 the entire corpus, under 3 GB all in, beats the full-precision 12B on ~24 GB.
 
@@ -235,27 +227,23 @@ We intend to continue profiling state of the art open source models as they come
 ### The thing that didn't work
 
 The obvious next idea: instead of one corpus for everybody, build each model a
-corpus of the facts *it personally* doesn't know.
-
-We built the machinery, and the parts work. We can predict a given model's blind
-spots from the corpus alone with decent accuracy, and different model families
-genuinely do have different blind spots (models from the same family miss the
-same facts; models from different families don't).
+corpus of the facts *it personally* doesn't know. We built the machinery. It
+works, in the sense that we can predict a given model's blind spots from the
+corpus alone with decent accuracy, and different model families genuinely do
+have different blind spots (models from the same family miss the same facts;
+models from different families don't).
 
 It lost anyway. At every size, the plain generic corpus beat the personalized
 one, decisively.
 
 The reason is the useful part. Picking facts for a model needs two things: which
-facts it doesn't know, and which facts someone is going to ask about.
-
-> The corpus can tell you the first. It cannot tell you the second, which is a
-> property of the people asking, not of the data.
-
-Personalized selection spent its budget on obscure facts the model didn't know
-and nobody asks about, while dropping common facts it also didn't know. When we
-cheated and used the actual questions to select, 0.9 MB outperformed the generic
-1.5 GB corpus. So the ceiling is real. It just isn't reachable from the corpus
-side.
+facts it doesn't know, and which facts someone is going to ask about. The corpus
+can tell you the first. It cannot tell you the second, which is a property of
+the people asking, not of the data. Personalized selection spent its budget on
+obscure facts the model didn't know and nobody asks about, while dropping common
+facts it also didn't know. When we cheated and used the actual questions to
+select, 0.9 MB outperformed the generic 1.5 GB corpus. So the ceiling is real.
+It just isn't reachable from the corpus side.
 
 ## Hardware this ran on
 
@@ -341,9 +329,6 @@ The hosted endpoint is a demo. It runs on Cloudflare Free Tier that you can host
   are the goal, so a new build is a small patch rather than a new download.
 - **Checking output, not just feeding input.** Same corpus, opposite direction:
   take what a model wrote and flag the claims the corpus doesn't support.
-- **A citable release.** A pinned version with a DOI, so results can be
-  referenced and reproduced against exactly the bytes they were measured on.
-
 ## Status
 
 Research phase, published as it lands. Done: two model families end to end, the
