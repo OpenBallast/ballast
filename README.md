@@ -4,182 +4,202 @@
 
 ## What this is
 
-A language model is a reasoning engine fused to an encyclopedia. Most of what a
-bigger model buys you is the encyclopedia, and parameters are an expensive place
-to store facts.
+A language model is two things fused together: something that can reason and
+read, and something that has memorized an encyclopedia. Most of what you get
+from a bigger model is the encyclopedia — and parameters are an expensive place
+to keep facts.
 
-Ballast separates the two. The knowledge ships as a versioned, CC0 file that
-sits next to the model. It comes in nested sizes (L0 = 36 MB up to L7 = 1.5 GB
-of Parquet; the CLI's prebuilt SQLite levels run somewhat larger), so you pick a
-knowledge level the same way you pick a quant. The model reads from it at answer
-time.
+Ballast splits them apart. The facts ship as a plain file that sits next to the
+model, free to copy and rebuild by anyone. It comes in sizes — 36 MB up to
+1.5 GB — so you pick how much world knowledge you want the same way you pick a
+quant. The model looks things up in it while answering.
 
-Measured result: a 2B model plus a 470 MB ballast file exceeds a 12B model's
-factual accuracy — end to end, with a real entity linker doing the lookups.
-Under perfect retrieval it takes 180 MB. Either way, the same gain through
-parameters costs ~19 GB of weights, and ballast bytes sit in flash/RAM rather
-than VRAM.
+The result we measured: a 2B model with a 470 MB file beside it answers factual
+questions more accurately than a 12B model does on its own. Buying that same
+accuracy with parameters costs about 19 GB of weights. And those 470 MB sit on
+disk, not in VRAM.
 
-## Pain points
+## Problems this addresses
 
-**"Small models are brain-damaged."** Gemma-4-E2B answers 60.8% of factual
-probes from its weights, and 86.8% when handed a short evidence snippet. It can
-use facts it's given; it doesn't have room to memorize them. The problem is
-missing knowledge, not missing capability.
+**"Small models are dumb."** Not exactly — they're *ignorant*. Gemma-4-E2B gets
+61% of factual questions right from memory. Hand it a couple of relevant lines
+of evidence and it gets 87%. It could always use the fact; it just never had
+room to store it. That gap is the whole idea.
 
-**"It makes things up."** Same model, same probes: hallucination drops from 0.24
-to 0.07 with ballast attached. In the live demo, two raw models gave different
-wrong birthplaces for Douglas Adams (London, Surrey); one corpus lookup
-corrected both. It holds where copying can't explain it — on two-hop questions
-whose answer only exists by joining two evidence lines, hallucination falls
-3–20×.
+**"It makes things up."** Attaching the corpus cuts hallucination on that same
+model from 24% to 7%. It isn't just copying answers out of the text either — on
+questions that require chaining two facts together (*"where was the director of
+this film born?"*, where neither line contains the answer alone), made-up
+answers drop by 3–20×.
 
-The boundary is measured too, and it cuts the other way: on questions with **no**
-true answer (false premises, properties nobody recorded), evidence suppresses
-correct abstention and fabrication *rises* — 0.18–0.27 ungrounded to 0.31–0.44
-at the full corpus, in every model and quant we tested. Grounding helps when the
-question has an answer. It does not teach a model to say "I don't know."
+There's a catch, and we measured it rather than hiding it: when a question has
+**no** true answer — a false premise, or a detail nobody ever recorded —
+evidence makes things *worse*. Fabrication goes from ~22% to ~37%. Handing a
+model a page about the right person seems to read as permission to answer, even
+when the page doesn't contain the answer. So: this fixes questions that have
+answers. It does not teach a model to say "I don't know."
 
-**"My GPU has 8/12/16 GB."** VRAM spent memorizing the long tail of Wikipedia is
-VRAM unavailable for context or a better engine. Ballast moves those facts to
-disk. A 16 GB desktop card runs the full demo: two models plus corpus lookups.
+**"My GPU only has 8/12/16 GB."** Every gigabyte of weights spent memorizing
+obscure Wikipedia entries is a gigabyte not spent on context or a better engine.
+Ballast moves those facts to disk, where they're cheap. The whole demo — two
+models plus lookups — runs on one 16 GB desktop card.
 
-**"The model's knowledge is stale."** Weights update at training time only. A
-ballast rebuilds monthly from public dumps, without retraining or re-downloading
-the model.
+**"The model's knowledge is stale."** Weights only learn at training time. The
+corpus rebuilds monthly from public dumps. You update what the model knows
+without retraining it or redownloading it.
 
-**"We can't send data to anyone's API."** The common hallucination fixes — web
-search, hosted RAG, embedding APIs — need a network. A ballast is a static
-file: copy it across the air gap once and the knowledge layer runs offline.
-Relevant for defense, healthcare, ships, factory floors, and data-residency
-regimes. Because it's a single versioned artifact, you can also audit exactly
-what the model has access to.
+**"We can't send data to anyone's API."** Every common fix for hallucination —
+web search, hosted RAG, embedding APIs — needs a network connection. This is a
+static file. Copy it across the air gap once and the knowledge layer works
+offline, forever. Useful for defense, healthcare, ships, factory floors, and
+anywhere data isn't allowed to leave. It's also one versioned file, so you can
+say exactly what the model does and doesn't have access to.
 
-**"Serving costs."** If a 2B engine with a knowledge sidecar matches a 12B on
-factual work, that's ~6× fewer parameters to run per token — partly offset by
-the evidence block, which adds a few hundred prefill tokens per grounded
-question. The sidecar itself serves from commodity storage; the demo endpoint
-runs on a $0/month free tier. Knowledge becomes one shared copy per cluster
-instead of a per-GPU parameter cost.
+**"Serving is too expensive."** If a 2B engine with a knowledge file matches a
+12B on factual work, you're running 6× fewer parameters per token. (Partly
+offset — the evidence adds a few hundred tokens to each grounded question.) The
+file itself serves from ordinary storage; our demo endpoint costs $0/month. One
+copy of the knowledge per cluster, instead of paying for it in every GPU.
 
 ## Who this is for
 
-- **Local runners** — pair a small model with the level that fits your disk.
-  L3 (179 MB) already lifts E2B past E4B's raw accuracy with real linking (L2,
-  107 MB, under perfect retrieval).
+- **Local runners** — pair a small model with whatever level fits your disk.
+  179 MB is enough to push a 2B past a 4B's factual accuracy.
 - **Edge & embedded** — engine in silicon, facts in flash, knowledge updated
-  over the air without touching weights.
-- **Air-gapped operators** — the knowledge layer crosses the gap as one
-  auditable file and runs offline.
-- **Fleet operators** — serve smaller engines, mount one shared artifact per
-  cluster, refresh it monthly.
-- **Old-model owners** — once ballasted, E4B ≈ 12B. Models age faster in what
-  they know than in what they can read, so older models may come back further
-  than expected.
-- **Researchers** — 50k linked probes, exact composition methodology, caveats
-  documented. Start with [THESIS.md](THESIS.md).
+  over the air without touching the model.
+- **Air-gapped operators** — the knowledge layer crosses the gap as one file you
+  can audit, and runs with no network at all.
+- **Fleet operators** — smaller engines, one shared file mounted per cluster,
+  refreshed monthly.
+- **Owners of older models** — once ballasted, a 4B matches a 12B. Models age
+  much faster in what they know than in what they can do, so an old model may
+  have more life left in it than you'd think.
+- **Researchers** — 50k probes, full methodology, caveats documented. Start with
+  [THESIS.md](THESIS.md).
 
 ## "Isn't this just RAG?"
 
-Mechanically, yes: retrieval at answer time. The differences:
+Mechanically, yes — look something up, put it in the prompt. What's different is
+what's being offered:
 
-- **Nested levels** (L0–L7) make knowledge-per-byte a tunable knob like
-  Q4/Q6/Q8. The value-per-byte curve is measured, smooth, and concave — the
-  first 100 MB is worth ~14× the last.
-- **One canonical CC0 artifact** anyone can pin, cite, diff, and rebuild from
-  public dumps, instead of a private vector DB and embedding pipeline.
-- **The measured quantity is the exchange rate** between corpus bytes and
-  parameter bytes, on the same probes, across model sizes and weight quants.
-  That rate (~40–100×) is the finding, not "retrieval helps."
-- **One artifact is the right shape, and we tried to disprove it.** Models from
-  different lineages miss *different* facts (agreement between miss-sets: κ
-  0.27–0.55 across families, 0.67–0.90 within one), so per-model corpora looked
-  promising. They lose. Ballasts selected for a specific model — using
-  competence models that predict its gaps at AUC ~0.8 — were beaten by the plain
-  generic prefix at every equal-byte size. Corpus features can tell you what a
-  model doesn't know, but not what anyone will ask, and selection needs both.
-  Details, including the oracle ceiling that says the idea isn't dead:
-  [THESIS.md §4.8](THESIS.md).
+- **It comes in sizes.** L0 through L7 make knowledge-per-byte a dial, like
+  Q4/Q6/Q8. The curve is measured and it's steep at the start: the first 100 MB
+  is worth about 14× as much as the last 100 MB. Most of the benefit is cheap.
+- **It's one public file.** Anyone can pin it, cite a version, diff two
+  versions, or rebuild it from the same public dumps. Not a private vector
+  database and an embedding pipeline you have to maintain.
+- **The thing being measured is an exchange rate** — how many bytes of corpus
+  buy you what a byte of parameters buys — across model sizes and quantization
+  levels. That number (40–100×) is the finding. "Retrieval helps" isn't news.
+- **We tried to build a better, model-specific version and failed.** Details
+  below; it's one of the more useful things we learned.
 
 ## Numbers
 
-Measured on 50,147 factual probes (PopQA, SimpleQA, Natural Questions, TriviaQA,
-plus an uncontaminated self-generated set). Methodology and full tables in
-[THESIS.md](THESIS.md).
+Measured on 50,147 factual questions drawn from PopQA, SimpleQA, Natural
+Questions, TriviaQA, and a set we generated ourselves to rule out
+contamination. Full tables and method in [THESIS.md](THESIS.md).
 
-| model (bf16) | raw accuracy | + full ballast (1.51 GB) | hallucination raw → ballasted |
+| model | on its own | with the full 1.5 GB file | made-up answers, before → after |
 |---|---|---|---|
-| Gemma-4-E2B | 0.608 | **0.868** | 0.242 → **0.074** |
-| Gemma-4-E4B | 0.662 | **0.910** | 0.197 → 0.042 |
-| Gemma-4-12B | 0.683 | **0.910** | 0.207 → 0.049 |
+| Gemma-4-E2B | 61% | **87%** | 24% → **7%** |
+| Gemma-4-E4B | 66% | **91%** | 20% → 4% |
+| Gemma-4-12B | 68% | **91%** | 21% → 5% |
 
-| to match… | ballast route | parameter route | advantage |
+The interesting part is the shape. On their own the three models are spread out
+— that's the memorization gap. Once all three can look things up, they land in
+the same place. What separates a 2B from a 12B, factually, is mostly what it
+memorized, and that part can be bought back cheaply.
+
+Same experiment on a completely unrelated model family:
+
+| model | on its own | with the full 1.5 GB file | made-up answers, before → after |
 |---|---|---|---|
-| E4B's raw accuracy (from E2B) | **+110 MB** | +4.4 GB of weights | ~40× |
-| 12B's raw accuracy (from E2B) | **+180 MB** | +19.4 GB of weights | ~100× |
+| Qwen3.5-0.8B | 32% | **78%** | 60% → **11%** |
+| Qwen3.5-2B | 36% | 77% | 55% → 14% |
+| Qwen3.5-4B | 43% | **83%** | 47% → **10%** |
+| Qwen3.5-9B | 54% | 82% | 33% → 11% |
 
-(Crossing sizes here assume perfect entity resolution — what that costs in
-practice is measured two sections down.)
+The pattern holds, and gets blunter: the **ballasted 4B beats the ballasted 9B**.
+The 0.8B with a 180 MB file overtakes the raw 9B — a jump that costs about 16 GB
+of extra weights to buy the normal way. And its rate of making things up falls
+by more than five times.
 
-It replicates on a second, unrelated family:
+### What it costs to look things up for real
 
-| model (bf16) | raw accuracy | + full ballast (1.51 GB) | hallucination raw → ballasted |
-|---|---|---|---|
-| Qwen3.5-0.8B | 0.324 | **0.784** | 0.601 → **0.114** |
-| Qwen3.5-2B | 0.363 | 0.770 | 0.552 → 0.137 |
-| Qwen3.5-4B | 0.434 | **0.831** | 0.474 → **0.095** |
-| Qwen3.5-9B | 0.542 | 0.819 | 0.329 → 0.113 |
+The tables above assume the lookup always finds the right entity. Real software
+doesn't. So we built a deliberately unglamorous one — no embeddings, no model
+calls, just capitalized-phrase matching against a name index — and measured what
+it actually delivers: **about two thirds** of the ideal benefit.
 
-Raw accuracy spreads 0.32–0.54; ballasted lands in a 0.77–0.83 band. The
-**ballasted 4B beats the ballasted 9B outright**, and the 0.8B plus 180 MB
-passes the 9B's raw accuracy — a gain that costs ~16 GB of weights to buy with
-parameters. The 0.8B's hallucination rate falls more than 5×.
+One surprise worth knowing: looking up the *wrong* entity is nearly harmless.
+Feed a model facts about the wrong Douglas Adams and it mostly ignores them. So
+the thing to optimize is finding *something*, not being careful. That's a much
+easier engineering problem.
 
-### What real retrieval costs you
+With the real lookup in the loop, the headline holds: a 2B with the full file
+beats a 12B on its own, comfortably. The sharper version of the claim — 180 MB
+is enough — needs 470 MB once you account for imperfect lookups. Still roughly
+40× cheaper than the parameter route.
 
-The tables above assume perfect entity resolution — every question finds the
-right entity. So we measured a real one: a non-generative linker (span mining +
-name index, no embeddings) on the same 50,147 probes. It realizes **63–66%** of
-the oracle gain (52% before disambiguation and fuzzy matching); wrong links turn
-out to be roughly harmless, because models ignore evidence that doesn't fit the
-question. At that floor the full-corpus crossing holds comfortably, and the
-sharp "+180 MB beats a 12B" claim becomes +470 MB. Both numbers are in
-[THESIS.md §4.7](THESIS.md); caveats in [§5](THESIS.md).
+### If you run quantized models, this part is for you
 
-### If you run quantized weights, read this one
+Squeezing a model to 4-bit does wildly different things to different models —
+and it's not about size:
 
-Weight quantization interacts with ballast in a way that isn't size-monotonic:
-
-| model @ nf4 | raw (Δ vs bf16) | + full ballast (Δ vs bf16) |
+| model at 4-bit | on its own | with the full file |
 |---|---|---|
-| Gemma-4-E2B | 0.587 (−0.021) | 0.842 (−0.026) |
-| Gemma-4-E4B | 0.485 (**−0.177**) | 0.650 (**−0.260**) |
-| Gemma-4-12B | 0.673 (−0.010) | 0.903 (−0.007) |
+| Gemma-4-E2B | 59% (barely changed) | 84% (barely changed) |
+| Gemma-4-E4B | 49% (**down from 66%**) | 65% (**down from 91%**) |
+| Gemma-4-12B | 67% (barely changed) | 90% (barely changed) |
 
-"Q4 ruined this model" and "Q4 is free" are both true — of different models. The
-12B rides the whole bf16 → fp8 → nf4 sweep almost untouched (grounded 0.910 →
-0.903); the E4B falls off a cliff (0.910 → 0.841 → 0.650). And when
-quantization damages the engine, no amount of corpus buys it back: the E4B's
-grounded ceiling collapses with its raw floor, meaning nf4 broke its ability to
-*read* evidence.
+"Q4 ruined this model" and "Q4 is basically free" are both true — of different
+models, and you can't guess which from the parameter count. The middle model
+here is the one that breaks.
 
-The useful part: the grounded ceiling is a diagnostic that tells the two cases
-apart, and it inverts the usual ordering — at nf4 the smaller Gemma is strictly
-better once ballasted (0.842 vs 0.650), and E2B@nf4 plus the full corpus, under
-3 GB total, beats the raw 12B at bf16 on ~24 GB.
+What ballast adds is a way to tell them apart. When a model is merely *forgetful*
+after quantization, the file gives the knowledge back. When quantization has
+damaged its ability to read and follow evidence, the score stays low no matter
+how much corpus you hand it — and that's exactly what the broken model looks
+like. Its accuracy *with* evidence is the tell.
+
+Practical consequence: at 4-bit the smaller Gemma is the better model once
+ballasted (84% vs 65%), which reverses the usual ordering. And a 4-bit 2B plus
+the entire corpus — under 3 GB all in — beats the full-precision 12B on ~24 GB.
+
+### The thing that didn't work
+
+The obvious next idea: instead of one corpus for everybody, build each model a
+corpus of the facts *it personally* doesn't know. We built the machinery. It
+works — we can predict a given model's blind spots from the corpus alone, fairly
+accurately, and different model families genuinely do have different blind spots
+(models from the same family miss the same facts; models from different families
+don't).
+
+It lost anyway. At every size, the plain generic corpus beat the personalized
+one, decisively.
+
+The reason is the useful part. Picking facts for a model needs two things: which
+facts it doesn't know, and which facts someone is going to ask about. The corpus
+can tell you the first. It cannot tell you the second — that's a property of the
+people asking, not of the data. Personalized selection spent its budget on
+obscure facts the model didn't know and nobody asks about, while dropping common
+facts it also didn't know. When we cheated and used the actual questions to
+select, 0.9 MB outperformed the generic 1.5 GB corpus — so the ceiling is real,
+it just isn't reachable from the corpus side.
 
 ## Get it
 
 | what | where |
 |---|---|
-| **`ballast` CLI** (pull the corpus, ground Ollama / any MCP client) | [github.com/OpenBallast/ballast-cli](https://github.com/OpenBallast/ballast-cli) |
-| **T0 corpus** (25.4M entities, 197M triples, levels L0–L7) | [huggingface.co/datasets/OpenBallast/ballast-t0](https://huggingface.co/datasets/OpenBallast/ballast-t0) |
-| **Eval sets** (50k linked probes) | [huggingface.co/datasets/OpenBallast/ballast-evalsets](https://huggingface.co/datasets/OpenBallast/ballast-evalsets) |
-| **Live demo endpoint** (MCP + HTTP, L0–L5) | [mcp.openballast.org](https://mcp.openballast.org) — see [docs/mcp.md](docs/mcp.md) |
+| **`ballast` CLI** (download the corpus, plug it into Ollama or any MCP client) | [github.com/OpenBallast/ballast-cli](https://github.com/OpenBallast/ballast-cli) |
+| **The corpus** (25.4M entities, 197M facts, levels L0–L7) | [huggingface.co/datasets/OpenBallast/ballast-t0](https://huggingface.co/datasets/OpenBallast/ballast-t0) |
+| **The question sets** (50k probes) | [huggingface.co/datasets/OpenBallast/ballast-evalsets](https://huggingface.co/datasets/OpenBallast/ballast-evalsets) |
+| **Live demo endpoint** (MCP + HTTP) | [mcp.openballast.org](https://mcp.openballast.org) — see [docs/mcp.md](docs/mcp.md) |
 
 ## Try it
 
-Locally, against Ollama (this is the plug-and-play path):
+Against a local Ollama — this is the whole setup:
 
 ```bash
 uvx --from git+https://github.com/OpenBallast/ballast-cli openballast pull --level 3
@@ -189,8 +209,8 @@ uvx --from git+https://github.com/OpenBallast/ballast-cli openballast serve
 
 (PyPI package coming; it becomes just `uvx openballast`.)
 
-First live A/B on a 0.5B model: raw answer to "Where was Douglas Adams born?"
-was *Dublin*; through the proxy, *Cambridge*.
+First live A/B on a 0.5B model — "Where was Douglas Adams born?" On its own:
+*Dublin*. Through the proxy: *Cambridge*.
 
 Or without installing anything:
 
@@ -198,22 +218,20 @@ Or without installing anything:
 curl "https://mcp.openballast.org/lookup?question=Where+was+Douglas+Adams+born%3F&level=5"
 ```
 
-The hosted endpoint is a demo; canonical downloads live on Hugging Face.
+The hosted endpoint is a demo. The real downloads live on Hugging Face.
 
 ## Docs
 
-- [THESIS.md](THESIS.md) — thesis, methodology, measured numbers, caveats
-- [docs/artifact.md](docs/artifact.md) — corpus layout, quantization levels, how to load
+- [THESIS.md](THESIS.md) — the research version: methodology, every number, every caveat
+- [docs/artifact.md](docs/artifact.md) — what's in the corpus and how to load it
 - [docs/mcp.md](docs/mcp.md) — demo endpoint reference
 
 ## Status
 
-Research phase. Done and published: two model families end to end, the
-bf16/fp8/nf4 quant sweep, the realized-retrieval measurement, model-aware
-selection (a negative result), cross-family miss-set overlap, and the
-hallucination probes beyond recall. Still running: GGUF K-quant cells (Q6_K,
-Q4_K_M — whether integer quantization moves these curves) and models above 12B.
-Results land here as they complete. Tooling for building and tuning your own
-ballasts will be open-sourced separately.
+Research phase, published as it lands. Done: two model families end to end, the
+quantization sweep, the real-lookup measurement, the personalized-corpus attempt
+(which failed, informatively), and the hallucination experiments. Still running:
+GGUF quantizations and models above 12B. Tooling for building your own corpus
+will be open-sourced separately.
 
-Docs are CC-BY-4.0. Corpus data is CC0 (Wikidata contributors).
+Docs are CC-BY-4.0. The corpus is CC0 (thanks to Wikidata's contributors).
