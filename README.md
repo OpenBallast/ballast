@@ -183,8 +183,8 @@ falls by more than five times.
 
 ### What it costs to look things up for real
 
-The tables above assume the lookup always finds the right entity. Real software
-doesn't. So we built a deliberately unglamorous one (no embeddings, no model
+The tables above assume the lookup always finds the right entity. In practically,
+that is hopeful optimism. So we built a caveman one (no embeddings, no model
 calls, just capitalized-phrase matching against a name index) and measured what
 it actually delivers: **about two thirds** of the ideal benefit.
 
