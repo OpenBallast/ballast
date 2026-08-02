@@ -6,7 +6,8 @@ We measured how much of a bigger model's factual advantage is just memorized
 trivia, and whether you can buy that back with a file instead of with
 parameters. You can, and it's 40–100× cheaper per byte.
 
-**What we found, on 50,147 factual questions across two model families:**
+**What we found, on 50,147 factual questions plus a 43,000-probe hallucination
+suite, across two model families:**
 
 - A 2B model with a 470 MB fact file beside it beats a 12B model on its own.
   Getting there with parameters costs ~19 GB of weights.
@@ -43,8 +44,9 @@ to keep facts.
 
 Ballast splits them apart. The facts ship as a plain file that sits next to the
 model, free for anyone to copy or rebuild. It comes in sizes, from 36 MB up to
-1.5 GB, so you pick how much world knowledge you want the same way you pick a
-quant. The model looks things up in it while answering.
+1.5 GB (the CLI's ready-to-serve database builds run somewhat larger), so you
+pick how much world knowledge you want the same way you pick a quant. The model
+looks things up in it while answering.
 
 The result we measured: a 2B model with a 470 MB file beside it answers factual
 questions more accurately than a 12B model does on its own. Buying that same
@@ -222,8 +224,6 @@ Practical consequence: at 4-bit the smaller Gemma is the better model once
 ballasted (84% vs 65%), which reverses the usual ordering. And a 4-bit 2B plus
 the entire corpus, under 3 GB all in, beats the full-precision 12B on ~24 GB.
 
-We intend to continue profiling state of the art open source models as they come out.
-
 ### The thing that didn't work
 
 The obvious next idea: instead of one corpus for everybody, build each model a
@@ -247,7 +247,8 @@ It just isn't reachable from the corpus side.
 
 ## Hardware this ran on
 
-**Build and evaluation box.** Every number in this README was produced here.
+**Build and evaluation box.** All benchmark numbers in this README were
+produced here.
 
 | | |
 |---|---|
@@ -292,7 +293,8 @@ Or without installing anything:
 curl "https://mcp.openballast.org/lookup?question=Where+was+Douglas+Adams+born%3F&level=5"
 ```
 
-The hosted endpoint is a demo. It runs on Cloudflare Free Tier that you can host yourself. The real downloads live on Hugging Face.
+The hosted endpoint is a demo. It runs on Cloudflare's free tier, and you can
+host your own for $0. The real downloads live on Hugging Face.
 
 ## Docs
 
@@ -316,13 +318,14 @@ The hosted endpoint is a demo. It runs on Cloudflare Free Tier that you can host
 - **Bring your own corpus.** The format and the loader contract get published so
   anyone can turn their own documents, or their national statistics office, into
   a ballast without waiting for us.
-  
+
 ## Status
 
 Research phase, published as it lands. Done: two model families end to end, the
 quantization sweep, the real-lookup measurement, the personalized-corpus attempt
 (which failed, informatively), and the hallucination experiments. Still running:
-GGUF quantizations and models above 12B. Tooling for building your own corpus
-will be open-sourced separately.
+GGUF quantizations and models above 12B. We intend to keep profiling
+state-of-the-art open-source models as they come out. Tooling for building your
+own corpus will be open-sourced separately.
 
 Docs are CC-BY-4.0. The corpus is CC0 (thanks to Wikidata's contributors).
