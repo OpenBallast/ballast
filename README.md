@@ -115,8 +115,7 @@ If a 2B engine with a knowledge file matches a 12B on factual work, you're
 running 6× fewer parameters per token. (Note: we are using a bit of context, as
 the evidence adds a few hundred tokens to each grounded question.)
 
-The file itself serves from ordinary storage; our demo endpoint costs $0/month.
-One copy of the knowledge per cluster, instead of paying for it in every GPU.
+The file itself serves from ordinary storage. One copy of the knowledge per cluster, instead of paying for it in every GPU.
 
 ## Who this is for
 
