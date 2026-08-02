@@ -163,6 +163,10 @@ compress, head-heavy value-per-byte) is identical.
 | E2B reaches E4B's raw accuracy | **+110 MB** of ballast (L2: 0.672 > 0.662) | +2.2B params ≈ 4.4 GB bf16 | **~40×** |
 | E2B reaches 12B's raw accuracy | **+180 MB** of ballast (L3: 0.712 > 0.683) | +9.7B params ≈ 19.4 GB bf16 | **~100×** |
 
+![Accuracy vs total on-disk bytes for the Gemma ladder. Each model's corpus spending rises near-vertically while the parameters-only line crawls: bytes of context buy far more accuracy than bytes of parameters.](assets/figures/equal_bytes.png)
+
+*Each solid line is one model spending additional bytes on corpus; the dashed line is the same budget spent on parameters instead. Corpus spend is near-vertical at this scale — the crossings in the table are visible as each small model's line climbing past the larger models' starting points.*
+
 ### 4.3 Rate–distortion is smooth and concave
 
 Marginal value per gigabyte falls ~14× from the head of the corpus to the tail (E2B: 0.71 accuracy-points/GB at L1 → 0.05 at L7), with the same shape across model sizes. Truncation is a real quality knob — graceful degradation, no cliff — which is what makes corpus quantization levels meaningful.
@@ -195,6 +199,14 @@ bits per weight) shows it as a dose-response:
 | Q6_K | ~6.6 | 0.655 → 0.908 | 0.681 → 0.910 |
 | Q4_K_M | ~4.8 | 0.504 → **0.716** | 0.673 → 0.905 |
 | nf4 | ~4.5 | 0.485 → **0.650** | 0.673 → 0.903 |
+
+![Raw floor and ballasted ceiling per quant level. The 12B lines are flat across all five levels; E4B's lines plunge between Q6_K and Q4_K_M — the cliff.](assets/figures/quant_cliff.png)
+
+*The cliff, located: E4B (blue) is intact through Q6_K and collapses at the ~4-bit levels, on both its raw floor (dashed) and its ballasted ceiling (solid). 12B (orange) is flat everywhere. Note fp8 denting E4B's ceiling while the lower-bit Q6_K does not — format matters, not just bits.*
+
+![Full rate-distortion curve family per model across the five quant levels. E4B's Q6_K curve sits exactly on bf16 while Q4_K_M and nf4 run parallel but far below; all five 12B curves coincide.](assets/figures/quant_curves.png)
+
+*The same cells as full curves. E4B's Q6_K (green) is indistinguishable from bf16 (blue, underneath it) at every corpus size; the two ~4-bit curves rise in parallel but never recover — a damaged reader gains from evidence at the same rate, from a permanently lower base. Every 12B curve coincides.*
 
 The 12B's grounded ceiling is untouched across the entire sweep, K-quants
 included (worst case 0.910 → 0.903). E4B's collapses with quantization depth —
