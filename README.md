@@ -10,9 +10,11 @@ parameters. You can, and it's 40–100× cheaper per byte.
 
 - A 2B model with a 470 MB fact file beside it beats a 12B model on its own.
   Getting there with parameters costs ~19 GB of weights.
-- Once every model can look facts up, they converge: 61/66/68% becomes
-  87/91/91%. What separates a small model from a big one, factually, is mostly
-  what it memorized, not what it can do.
+- Answering from memory alone, a 2B, a 4B and a 12B from the same family get
+  61%, 66% and 68% of those questions right. Give all three the same file to
+  look facts up in and they land at 87%, 91% and 91%. What separates a small
+  model from a big one, factually, is mostly what it memorized, not what it can
+  do.
 - Made-up answers drop from 24% to 7%. But on questions with no true answer,
   evidence makes fabrication *worse* (22% to 37%). This fixes answerable
   questions; it does not teach a model to abstain.
@@ -26,9 +28,9 @@ parameters. You can, and it's 40–100× cheaper per byte.
 **Why this matters if you deploy models.** The default answer to "it gets facts
 wrong" is a bigger model, and you pay for that in VRAM on every GPU you run.
 This says the cheaper move is a small engine plus a file. That file is static,
-versioned, auditable, works offline, and updates monthly without retraining
-anything. It also gives you a diagnostic for whether your quantized model is
-actually intact.
+versioned, auditable, works offline, and can be rebuilt from public dumps
+whenever you want the knowledge refreshed, without retraining anything. It also
+gives you a diagnostic for whether your quantized model is actually intact.
 
 ## What this is
 
@@ -73,8 +75,9 @@ Ballast moves those facts to disk, where they're cheap. The whole demo, two
 models plus lookups, runs on one 16 GB desktop card.
 
 **"The model's knowledge is stale."** Weights only learn at training time. The
-corpus rebuilds monthly from public dumps. You update what the model knows
-without retraining it or redownloading it.
+corpus is built from public dumps and can be rebuilt as often as those dumps
+land, by us or by you. You update what the model knows by swapping a file, with
+no retraining and no redownloading the model.
 
 **"We can't send data to anyone's API."** Every common fix for hallucination
 (web search, hosted RAG, embedding APIs) needs a network connection. This is a
@@ -98,7 +101,7 @@ copy of the knowledge per cluster, instead of paying for it in every GPU.
 - **Air-gapped operators.** The knowledge layer crosses the gap as one file you
   can audit, and runs with no network at all.
 - **Fleet operators.** Smaller engines, one shared file mounted per cluster,
-  refreshed monthly.
+  refreshed on whatever schedule you want.
 - **Owners of older models.** Once ballasted, a 4B matches a 12B. Models age
   much faster in what they know than in what they can do, so an old model may
   have more life left in it than you'd think.
