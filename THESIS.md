@@ -359,12 +359,12 @@ ranking already approximates the one quantity tuning cannot observe.
 
 ### 4.10 Hallucination beyond recall: composition falls, fabrication rises
 
-The §3.5 probe families, run over seven (model, quant) cells (E2B/E4B/12B at
-bf16; E4B/12B at fp8 and nf4), 43,137 probes per cell, logprob MC with the
-abstention triad at threshold 0.5. Hallucination rate = wrong answers per
+The §3.5 probe families, run over eleven (model, quant) cells (E2B/E4B/12B at
+bf16; E4B/12B at fp8, nf4, and GGUF Q6_K/Q4_K_M), 43,137 probes per cell,
+logprob MC with the abstention triad at threshold 0.5. Hallucination rate = wrong answers per
 attempt; each family read at every corpus cutoff (dose–response, as §4.6).
 
-**Composition (hop2, adversarial hop2, 2WikiMultiHopQA): PASS in all 21
+**Composition (hop2, adversarial hop2, 2WikiMultiHopQA): PASS in all 33
 family×cell readings.** Where copy-extraction cannot work — the answer exists
 only through a join across two evidence lines — grounding still collapses
 hallucination: hop2 0.34–0.49 ungrounded → 0.006–0.24 at full corpus;
@@ -374,15 +374,18 @@ spirit of Shi et al., 2023) costs a few points but does not change the
 verdict (12B bf16: 0.42 → 0.05). The fall is monotone in corpus level in
 every cell — a dose–response curve, not an endpoint artifact. E4B@nf4 is
 again the weakest cell (adversarial 0.61 → 0.44; 2WikiMultiHopQA 0.67 →
-0.42): a fourth appearance of the §4.6 cliff signature, now in hallucination
-rather than recall.
+0.42), and E4B@Q4_K_M is its sibling (hop2 recovery stalls at 0.25;
+2WikiMultiHopQA 0.68 → 0.46): fourth and fifth appearances of the §4.6 cliff
+signature, now in hallucination rather than recall. E4B@Q6_K meanwhile
+matches bf16 exactly (hop2 → 0.006) — the quant axis reproduces its §4.6
+shape wholesale in hallucination space.
 
-**Unanswerable/false-premise: FAIL in all 7 cells — fabrication *rises* with
+**Unanswerable/false-premise: FAIL in all 11 cells — fabrication *rises* with
 grounding.** Every candidate answer to these probes is false; any confident
 pick is a fabrication. Ungrounded, models abstain often (fabrication
 0.18–0.27). With evidence present, fabrication climbs — monotonically with
 coverage, roughly linearly (12B bf16: 0.243 ungrounded → 0.256 at L0 → 0.406
-at full corpus; +0.09 to +0.18 across cells). The mechanism is abstention
+at full corpus; +0.07 to +0.18 across cells). The mechanism is abstention
 suppression: an evidence block that mentions the question's entities — while
 containing no answer, because none exists — reads as license to answer.
 Grounding transfers trust from the model's calibration to the context, and
@@ -394,7 +397,7 @@ that evidence injection needs an answerability signal (or verifier pass) —
 already noted as out of scope for v1 in §6.
 
 **TruthfulQA control: imperfect.** The control demands |Δ| ≤ 0.02 under
-grounding; 3 of 7 cells pass, 4 move by +0.03 to −0.07 (coverage 0.56 — half
+grounding; 3 of 11 cells pass, 8 move by up to ±0.07 (coverage 0.56 — half
 the items link to corpus entities). The sign is inconsistent across cells, so
 this is not a systematic prompt artifact inflating the headline results, but
 the control cannot certify them either at the 2% margin: evidence injection
@@ -429,8 +432,9 @@ strongly favorable only when questions have answers.
 ## 6. What's running now / next
 
 - Boost verdicts for the remaining arms: E2B→31B, and the **quant-damage buyback** arm (12B Q4_K_M → Q6_K: what fraction of quantization's knowledge loss does targeted ballast recover, per MB). (E2B→E4B: measured, §4.8.)
-- Hallucination-beyond-recall GGUF cells (Q6_K / Q4_K_M — does integer
-  quantization move the §4.10 curves). (bf16/fp8/nf4 cells: done, §4.10.)
+- Cross-family quant pivots (Qwen3.5 4B/9B across the §4.6 axis — does the
+  E4B-style cliff appear outside the Gemma lineage). (Gemma GGUF cells, matrix
+  and hallucination: done, §4.6 / §4.10.)
 - Gemma-4-31B; cross-family miss-set overlap — if families miss *different* facts, a shared ballast is worth more than either family's tuning. (Qwen3.5 ladder: done, §4.1b. Overlap: done, §4.9.)
 - Legacy revival cells (Mistral-7B-class): grounding as a generation equalizer.
 - Tooling for third parties to build and tune their own ballasts (to be open-sourced separately).
