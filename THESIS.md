@@ -411,6 +411,24 @@ three-quarters when no true answer exists. Grounding, as implemented here, is
 not a hallucination fix — it is a trade of one failure mode against another,
 strongly favorable only when questions have answers.
 
+**Feasibility of the answerability signal (measured).** The signal the
+failure calls for may already live in the artifact: *subject covered but
+queried relation absent* — absence as evidence, a locally-applied closed-world
+check. On the relation-structured probe subset (23,901 grounded probes with
+resolvable property ids), that check false-fires on only **0.6–0.8% of
+answerable questions**, flat across subject-density terciles and all eight
+rank buckets — for core relations, Wikidata is near-closed-world wherever the
+subject exists at all. Per-relation false-alarm runs 0% (country, birthplace,
+occupation) to 3% (author). When it does false-fire, 79% of those evidence
+blocks still contain the gold via another rendering and the model answers
+84.5% of them correctly anyway — so a *warn-don't-suppress* policy on
+relation absence addresses the fabrication failure at near-zero cost to
+answerable traffic. It fires on 100% of the unanswerable probes, but that
+number is circular (the family was constructed from Wikidata absence) and
+does not transfer to open-domain false premises; the false-alarm rate is the
+genuine measurement. One line of evidence-block metadata, computable at
+retrieval time from the artifact alone.
+
 ## 5. Honest caveats
 
 - **Retrieval realization is a band, not a point**: matrix numbers are the
