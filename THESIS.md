@@ -115,7 +115,7 @@ Three ways to spend bytes on knowledge — parameter count, parameter precision,
 
 - **Size ladders at bf16**: Gemma-4 E2B / E4B / 12B; Qwen3.5 0.8B / 2B / 4B / 9B.
 - **Gemma span at nf4** including the 31B (the only quant where it fits 32 GB), kept on its own axis so nf4 damage is never silently compared to bf16.
-- **Quant sweep** on pivots (E4B, 12B): bf16 / fp8 / nf4 (Dettmers et al., 2023) / Q6_K / Q4_K_M (llama.cpp GGUF K-quants; Gerganov et al.) — GGUF K-quants scored via dequantization so the quantization error is preserved verbatim while deployment bytes are charged at the .gguf size.
+- **Quant sweep** on pivots (Gemma-4 E4B, 12B; Qwen3.5 4B, 9B): bf16 / fp8 / nf4 (Dettmers et al., 2023) / Q6_K / Q4_K_M (llama.cpp GGUF K-quants; Gerganov et al.) — GGUF K-quants scored via dequantization so the quantization error is preserved verbatim while deployment bytes are charged at the .gguf size. No public *base* K-quants exist for either family, so all GGUFs are self-converted from the base checkpoints; the Qwen3.5 ones additionally need a hand-written reverse of llama.cpp's conversion (transformers has no `qwen35` GGUF architecture), verified by tensor-wise roundtrip before use.
 
 ### 3.4 Model-aware ballast (the boost design)
 
@@ -247,6 +247,53 @@ grounded ceiling is the diagnostic that tells them apart. Corollary: at nf4 the
 *smaller* Gemma is strictly better once ballasted (0.842 vs 0.650), and
 E2B@nf4 + full ballast — under 3 GB of total footprint — beats the raw
 12B bf16 (0.842 vs 0.683 on ~24 GB).
+
+### 4.6b Cross-family: the cliff is lineage-specific, the diagnostic is not
+
+Everything above is one model family, so the same axis was run on Qwen3.5's
+two nearest pivots (4B and 9B Base — the analogs of E4B and 12B). Q6_K and
+Q4_K_M have no public *base* GGUFs and transformers has no `qwen35` GGUF
+architecture mapping at all, so both were self-converted with llama.cpp and
+loaded through a reverse mapping written for this project (roundtrip-verified
+against the original weights tensor-by-tensor before any cell was scored;
+worst relative error 4.5e-07, i.e. f16 rounding and nothing else).
+
+| quant | bits/wt | Qwen3.5-4B raw → ballasted | Qwen3.5-9B raw → ballasted |
+|---|---|---|---|
+| bf16 | 16 | 0.434 → 0.831 | 0.542 → 0.819 |
+| Q6_K | ~6.6 | 0.439 → 0.833 | 0.544 → 0.822 |
+| Q4_K_M | ~4.8 | 0.437 → **0.775** | 0.523 → 0.804 |
+| nf4 | ~4.5 | 0.426 → 0.815 | *(pending)* |
+
+**No E4B-style cliff appears in Qwen3.5.** Nothing here collapses: the worst
+ceiling loss is 5.6 points, against E4B's 26. The catastrophic mode is a
+property of that lineage, not of 4-bit quantization, and the honest scope of
+§4.6 is "some models fall off a cliff, and you cannot tell which from size or
+bit-count."
+
+**But a new failure mode shows up, and only the grounded ceiling sees it.**
+Qwen3.5-4B at Q4_K_M keeps its raw floor *exactly* (0.437 vs bf16 0.434 —
+inside noise, and nominally higher) while its ballasted ceiling falls 5.6
+points (0.831 → 0.775). Evaluated the ordinary way — a benchmark on the
+model alone — that cell reads as free. It is not: the quantization took
+something out of the model's ability to *use* supplied evidence while leaving
+recall of memorized facts untouched. Weight quantization damages reading and
+recall separately, and a raw benchmark measures only the second.
+
+**The format ranking inverts between families.** On Gemma-E4B, nf4 was the
+worse of the two ~4-bit formats (ceiling 0.650 vs Q4_K_M's 0.716). On
+Qwen3.5-4B it is the reverse, and by a factor of three: nf4 costs 1.6 ceiling
+points, Q4_K_M costs 5.6. "K-quants are gentler than nf4" is therefore not a
+fact about the formats — it is a per-model interaction, and one that only
+appears in the grounded measurement.
+
+**Q6_K is free in all six cells measured across both families** (four here,
+two in §4.6), on both floor and ceiling, at ~2.4× the compression of bf16.
+For the deployment question this thesis cares about, that is the practical
+answer: quantize to Q6_K, spend the saved bytes on ballast, and verify with a
+grounded probe rather than a raw one — because at the ~4-bit levels the
+damage is real, model-specific, format-specific, and invisible to the
+benchmark most people would run.
 
 ### 4.7 Realized retrieval — de-oracling the headline
 
@@ -445,14 +492,21 @@ retrieval time from the artifact alone.
   for false-premise fabrication.
 - **The TruthfulQA control is not clean**: 4 of 7 cells move beyond the 2%
   margin (±0.03–0.07, inconsistent sign) under grounding (§4.10).
+- **Quant damage does not have one shape**: across two families and four
+  pivots it appears as total collapse (E4B at 4-bit), proportional shrinkage
+  (Qwen-9B at Q4_K_M), reading-only loss with an intact raw floor (Qwen-4B at
+  Q4_K_M), or nothing at all (every Q6_K cell) — and which one you get is not
+  predictable from size, bit-count, or format alone (§4.6, §4.6b). Any
+  deployment claim about a specific quant should be measured on that
+  model, with a grounded probe.
 - Facts absent from Wikidata are absent from the ballast; T0 measures the triple-shaped slice of knowledge.
 
 ## 6. What's running now / next
 
 - Boost verdicts for the remaining arms: E2B→31B, and the **quant-damage buyback** arm (12B Q4_K_M → Q6_K: what fraction of quantization's knowledge loss does targeted ballast recover, per MB). (E2B→E4B: measured, §4.8.)
-- Cross-family quant pivots (Qwen3.5 4B/9B across the §4.6 axis — does the
-  E4B-style cliff appear outside the Gemma lineage). (Gemma GGUF cells, matrix
-  and hallucination: done, §4.6 / §4.10.)
+- Hallucination-family cells for the Qwen3.5 quant pivots (does the
+  reading-damage mode of §4.6b also move the §4.10 curves). (Matrix cells:
+  done, §4.6b.)
 - Gemma-4-31B; cross-family miss-set overlap — if families miss *different* facts, a shared ballast is worth more than either family's tuning. (Qwen3.5 ladder: done, §4.1b. Overlap: done, §4.9.)
 - Legacy revival cells (Mistral-7B-class): grounding as a generation equalizer.
 - Tooling for third parties to build and tune their own ballasts (to be open-sourced separately).
