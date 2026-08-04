@@ -262,8 +262,8 @@ worst relative error 4.5e-07, i.e. f16 rounding and nothing else).
 |---|---|---|---|
 | bf16 | 16 | 0.434 → 0.831 | 0.542 → 0.819 |
 | Q6_K | ~6.6 | 0.439 → 0.833 | 0.544 → 0.822 |
-| Q4_K_M | ~4.8 | 0.437 → **0.775** | 0.523 → 0.804 |
-| nf4 | ~4.5 | 0.426 → 0.815 | *(pending)* |
+| Q4_K_M | ~4.8 | **0.437** → **0.775** | 0.523 → 0.804 |
+| nf4 | ~4.5 | 0.426 → 0.815 | **0.507** → **0.826** |
 
 **No E4B-style cliff appears in Qwen3.5.** Nothing here collapses: the worst
 ceiling loss is 5.6 points, against E4B's 26. The catastrophic mode is a
@@ -271,14 +271,31 @@ property of that lineage, not of 4-bit quantization, and the honest scope of
 §4.6 is "some models fall off a cliff, and you cannot tell which from size or
 bit-count."
 
-**But a new failure mode shows up, and only the grounded ceiling sees it.**
-Qwen3.5-4B at Q4_K_M keeps its raw floor *exactly* (0.437 vs bf16 0.434 —
-inside noise, and nominally higher) while its ballasted ceiling falls 5.6
-points (0.831 → 0.775). Evaluated the ordinary way — a benchmark on the
-model alone — that cell reads as free. It is not: the quantization took
-something out of the model's ability to *use* supplied evidence while leaving
-recall of memorized facts untouched. Weight quantization damages reading and
-recall separately, and a raw benchmark measures only the second.
+**What these four cells show instead is a double dissociation between recall
+and reading.** The two bolded cells are mirror images:
+
+- *Qwen3.5-4B at Q4_K_M* keeps its raw floor exactly (0.437 vs bf16 0.434 —
+  inside noise, nominally higher) and loses 5.6 points of ballasted ceiling.
+  Recall intact, reading damaged.
+- *Qwen3.5-9B at nf4* loses 3.5 points of raw floor (0.507 vs 0.542) and its
+  ballasted ceiling does not move at all (0.826 vs 0.819, nominally higher).
+  Reading intact, recall damaged.
+
+Each capability is damaged in one cell and spared in the other, so this is not
+one underlying quantity measured two ways: **the ability to recall a fact from
+weights and the ability to read a fact from context are separately damageable
+by weight quantization.** That is the empirical basis for the whole thesis —
+if the two were one capability, moving knowledge out of the weights could not
+work — and it is also why the two measurements are not interchangeable in
+practice. A raw benchmark sees the second cell's loss and calls the first
+cell free; a grounded probe sees the opposite. Both are needed, and neither
+substitutes for the other.
+
+The 9B/nf4 cell is the thesis's mechanism in miniature: quantization deleted
+memorized facts, ballast supplied them back, and the result matched the
+unquantized model at ~28% of its weight bytes. That is "quantize the weights,
+ballast the knowledge" running as a measurement rather than a slogan — but
+note it is one cell out of eight, not a law.
 
 **The format ranking inverts between families.** On Gemma-E4B, nf4 was the
 worse of the two ~4-bit formats (ceiling 0.650 vs Q4_K_M's 0.716). On
@@ -292,8 +309,8 @@ two in §4.6), on both floor and ceiling, at ~2.4× the compression of bf16.
 For the deployment question this thesis cares about, that is the practical
 answer: quantize to Q6_K, spend the saved bytes on ballast, and verify with a
 grounded probe rather than a raw one — because at the ~4-bit levels the
-damage is real, model-specific, format-specific, and invisible to the
-benchmark most people would run.
+damage is real, model-specific, format-specific, and, in one direction,
+invisible to the benchmark most people would run.
 
 ### 4.7 Realized retrieval — de-oracling the headline
 
@@ -495,10 +512,11 @@ retrieval time from the artifact alone.
 - **Quant damage does not have one shape**: across two families and four
   pivots it appears as total collapse (E4B at 4-bit), proportional shrinkage
   (Qwen-9B at Q4_K_M), reading-only loss with an intact raw floor (Qwen-4B at
-  Q4_K_M), or nothing at all (every Q6_K cell) — and which one you get is not
-  predictable from size, bit-count, or format alone (§4.6, §4.6b). Any
-  deployment claim about a specific quant should be measured on that
-  model, with a grounded probe.
+  Q4_K_M), recall-only loss that ballast fully repairs (Qwen-9B at nf4), or
+  nothing at all (every Q6_K cell) — and which one you get is not predictable
+  from size, bit-count, or format alone (§4.6, §4.6b). Any deployment claim
+  about a specific quant should be measured on that model, with both a raw
+  and a grounded probe.
 - Facts absent from Wikidata are absent from the ballast; T0 measures the triple-shaped slice of knowledge.
 
 ## 6. What's running now / next
