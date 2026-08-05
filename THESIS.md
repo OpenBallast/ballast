@@ -440,12 +440,12 @@ ranking already approximates the one quantity tuning cannot observe.
 
 ### 4.10 Hallucination beyond recall: composition falls, fabrication rises
 
-The §3.5 probe families, run over eleven (model, quant) cells (E2B/E4B/12B at
-bf16; E4B/12B at fp8, nf4, and GGUF Q6_K/Q4_K_M), 43,137 probes per cell,
-logprob MC with the abstention triad at threshold 0.5. Hallucination rate = wrong answers per
+The §3.5 probe families, run over twelve (model, quant) cells (E2B/E4B/12B at
+bf16; E4B/12B at fp8, nf4, and GGUF Q6_K/Q4_K_M; 31B at nf4), 43,137 probes
+per cell, logprob MC with the abstention triad at threshold 0.5. Hallucination rate = wrong answers per
 attempt; each family read at every corpus cutoff (dose–response, as §4.6).
 
-**Composition (hop2, adversarial hop2, 2WikiMultiHopQA): PASS in all 33
+**Composition (hop2, adversarial hop2, 2WikiMultiHopQA): PASS in all 36
 family×cell readings.** Where copy-extraction cannot work — the answer exists
 only through a join across two evidence lines — grounding still collapses
 hallucination: hop2 0.34–0.49 ungrounded → 0.006–0.24 at full corpus;
@@ -459,9 +459,12 @@ again the weakest cell (adversarial 0.61 → 0.44; 2WikiMultiHopQA 0.67 →
 2WikiMultiHopQA 0.68 → 0.46): fourth and fifth appearances of the §4.6 cliff
 signature, now in hallucination rather than recall. E4B@Q6_K meanwhile
 matches bf16 exactly (hop2 → 0.006) — the quant axis reproduces its §4.6
-shape wholesale in hallucination space.
+shape wholesale in hallucination space. At the other end, the 31B@nf4 posts
+the lowest composed-hallucination rates measured anywhere in this project
+(hop2 0.307 → **0.002**, adversarial 0.403 → 0.011): the ladder top with a
+full corpus is wrong on roughly one composed question in 400.
 
-**Unanswerable/false-premise: FAIL in all 11 cells — fabrication *rises* with
+**Unanswerable/false-premise: FAIL in all 12 cells — fabrication *rises* with
 grounding.** Every candidate answer to these probes is false; any confident
 pick is a fabrication. Ungrounded, models abstain often (fabrication
 0.18–0.27). With evidence present, fabrication climbs — monotonically with
@@ -478,7 +481,7 @@ that evidence injection needs an answerability signal (or verifier pass) —
 already noted as out of scope for v1 in §6.
 
 **TruthfulQA control: imperfect.** The control demands |Δ| ≤ 0.02 under
-grounding; 3 of 11 cells pass, 8 move by up to ±0.07 (coverage 0.56 — half
+grounding; 3 of 12 cells pass, 9 move by up to ±0.07 (coverage 0.56 — half
 the items link to corpus entities). The sign is inconsistent across cells, so
 this is not a systematic prompt artifact inflating the headline results, but
 the control cannot certify them either at the 2% margin: evidence injection
