@@ -167,6 +167,13 @@ compress, head-heavy value-per-byte) is identical.
 |---|---|---|---|
 | E2B reaches E4B's raw accuracy | **+110 MB** of ballast (L2: 0.672 > 0.662) | +2.2B params ≈ 4.4 GB bf16 | **~40×** |
 | E2B reaches 12B's raw accuracy | **+180 MB** of ballast (L3: 0.712 > 0.683) | +9.7B params ≈ 19.4 GB bf16 | **~100×** |
+| E2B@nf4 reaches 31B@nf4's raw accuracy | **+466 MB** of ballast (L5: 0.769 > 0.732) | +28.7B params ≈ 16.3 GB nf4 | **~35×** |
+
+The last row is the ladder top, added once the 31B cell became runnable
+(§4.6): **a 2.3B model carrying 466 MB of corpus beats a 31B model on 7.2 GB
+of total footprint against 17.8 GB** — the same crossing as the first two
+rows, now against a model 13× its size and priced at nf4 on both sides rather
+than against full-precision weights.
 
 ![Accuracy vs total on-disk bytes for the Gemma ladder. Each model's corpus spending rises near-vertically while the parameters-only line crawls: bytes of context buy far more accuracy than bytes of parameters.](assets/figures/equal_bytes.png)
 
@@ -203,6 +210,15 @@ Same ladder at nf4 (own axis, never silently compared to bf16):
 | Gemma-4-E2B | 0.587 (−0.021) | 0.842 (−0.026) |
 | Gemma-4-E4B | 0.485 (**−0.177**) | 0.650 (**−0.260**) |
 | Gemma-4-12B | 0.673 (−0.010) | 0.903 (−0.007) |
+| Gemma-4-31B | 0.732 (no bf16 ref) | 0.934 (no bf16 ref) |
+
+The 31B is the ladder top and runs only at nf4 — 17.8 GB of weights against a
+32.6 GB card, with no bf16 reference possible on this hardware, so its row
+carries no delta. It behaves like the 12B rather than the E4B: highest raw
+floor (0.732) and highest ceiling (0.934) in the project, hallucination rate
+0.146 → 0.031 under full ballast. Scale does not confer immunity to the
+E4B-style cliff — E2B and 12B and 31B all ride nf4 while the 4.5B member
+between them does not — but nothing at this size showed the failure.
 
 The full pivot sweep (E4B, 12B at bf16 / fp8 / GGUF K-quants / nf4, ordered by
 bits per weight) shows it as a dose-response:
@@ -246,7 +262,8 @@ fixes a broken reader. The community's "Q4 made it unusable" experience and the
 grounded ceiling is the diagnostic that tells them apart. Corollary: at nf4 the
 *smaller* Gemma is strictly better once ballasted (0.842 vs 0.650), and
 E2B@nf4 + full ballast — under 3 GB of total footprint — beats the raw
-12B bf16 (0.842 vs 0.683 on ~24 GB).
+12B bf16 (0.842 vs 0.683 on ~24 GB) and, at 7.2 GB, the raw 31B@nf4 on
+17.8 GB (§4.2).
 
 ### 4.6b Cross-family: the cliff is lineage-specific, the diagnostic is not
 
