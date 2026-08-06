@@ -50,6 +50,10 @@ Everything above is one model family, so the same axis was run on Qwen3.5's two 
 
 **No E4B-style cliff appears in Qwen3.5.** Nothing here collapses: the worst ceiling loss is 5.6 points, against E4B's 26. The catastrophic mode is a property of that lineage, not of 4-bit quantization, and the honest scope of the cliff result is "some models fall off a cliff, and you cannot tell which from size or bit-count."
 
+![Qwen3.5 dose–response: raw floors and ballasted ceilings stay flat from bf16 down to nf4 — the visual absence of the cliff. (fp8 was not banked for this family.)](../assets/figures/quant_cliff_qwen.png)
+
+![Qwen3.5 rate–distortion curve family per model across the four banked quant levels.](../assets/figures/quant_curves_qwen.png)
+
 **What these four cells show instead is a double dissociation between recall and reading.** The two bolded cells are mirror images:
 
 - *Qwen3.5-4B at Q4_K_M* keeps its raw floor exactly (0.437 vs bf16 0.434 — inside noise, nominally higher) and loses 5.6 points of ballasted ceiling. Recall intact, reading damaged.
