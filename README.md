@@ -9,54 +9,57 @@ parameters. You can, and it's 40–100× cheaper per byte.
 On 50,147 factual questions plus a 43,000-probe hallucination suite, across
 two model families:
 
-- A 2B model with a 470 MB fact file beside it beats a 12B model on its own —
-  measured with a real lookup in the loop, not an idealized one. Buying that
-  accuracy with parameters costs ≈19 GB of weights at full precision, or ≈7 GB
-  at the kindest quantization that doesn't damage the 12B — still ≈15× more
-  bytes.
+- A 2B model with a 470 MB fact file beside it beats a 12B model on its own,
+  measured with a real lookup in the loop, not an idealized one. The same
+  accuracy bought with parameters costs ≈19 GB of weights at full precision,
+  or ≈7 GB at the kindest quantization that doesn't damage the 12B. Still
+  ≈15× more bytes.
 - From memory alone, a 2B / 4B / 12B from one family score 61 / 66 / 68%.
   Give all three the same file to look facts up in and they land at
   87 / 91 / 91%. The factual gap between model sizes is mostly memorization,
   and memorization is cheap to ship.
-- Made-up answers drop from 24% to 7% — but on questions with *no* true
+- Those are multiple-choice scores. Measured open-ended, with real
+  retrieval over the prose tier: 0.154 → 0.331 on open-domain questions,
+  against a 0.681 ceiling with perfect evidence. Far lower everywhere; if
+  you are deciding whether to run the proxy, these are the numbers to
+  decide on.
+- Made-up answers drop from 24% to 7%. But on questions with *no* true
   answer, evidence makes fabrication worse (24% → 41%). This fixes answerable
   questions; it does not teach abstention.
-- 4-bit quantization breaks some models and not others, unpredictably from
-  size — and accuracy *with* evidence is the test that tells you which case
-  you have.
+- 4-bit quantization breaks some models and not others, and size won't
+  predict which. Accuracy *with* evidence is the test that tells you which
+  case you have.
 - Building each model a personalized corpus of its own blind spots loses to
   one generic corpus, every time, at every size.
 
-The knowledge ships as a static, versioned, auditable file — offline forever,
+The knowledge ships as a static, versioned, auditable file: offline forever,
 rebuilt from public dumps, swapped without retraining anything.
 
 So go ahead. Download more VRAM.
 
 ## How to
 
-Two jobs bring most people here: **ballasting a model for local use** (make a
-small model factually competitive with a big one) and **using ballasts to
-diagnose quantization damage** (is this Q4 file broken, or just forgetful?).
-Both are below, then the rest of the loop. Everything is CPU-side except the
-model you already run. The CLI is one tool: `uvx openballast` (or
+Two jobs bring most people here: **diagnose quantization damage** (is this
+Q4 file broken, or just forgetful?) and **ballast a model for local use**
+(make a small model factually competitive with a big one). Everything is
+CPU-side except the model you already run. The CLI: `uvx openballast` (or
 `pip install openballast`; source at
 [ballast-cli](https://github.com/OpenBallast/ballast-cli)).
 
-### 1. Ballast a model for local use (two commands)
+Both jobs start with the corpus:
 
 ```bash
-uvx openballast pull --level 3     # 265 MB download → ~1 GB on disk
-uvx openballast serve              # grounding proxy :11435 + MCP :11436
+uvx openballast pull --level 3     # 275 MB download, ~1 GB on disk
 ```
 
-Point your client at `http://localhost:11435/v1` instead of `:11434`. That's
-the whole setup: every chat request gets relevant facts prepended before your
-model sees it — streaming and everything else passes through untouched.
+`pull` downloads [ballast-t0](https://huggingface.co/datasets/OpenBallast/ballast-t0),
+the reference corpus built from Wikidata: 25.4M entities as compact fact
+records, in SQLite serving form. `--level` picks how much of it, L0 (54 MB,
+the most-cited entities) up to L7 (2.3 GB, all of them). The prose tiers
+(t1, t2) are parquet datasets for now, not `pull` targets; for your own
+documents there's `ballast build` below.
 
-First live A/B on a 0.5B model, asked "Where was Douglas Adams born?" On its
-own: *Dublin*. Through the proxy: *Cambridge*.
-
-### 2. Diagnose quantization damage
+### 1. Diagnose quantization damage
 
 Quantization hurts models in two distinguishable ways, and raw benchmarks
 can't tell them apart: a **forgetful** model lost recall (evidence gives it
@@ -65,56 +68,83 @@ Grounded accuracy separates the cases. Run the three-arm benchmark on the
 quant you downloaded and on a known-good reference:
 
 ```bash
-ballast eval -m qwen3:8b-q4_K_M --limit 500 --outdir eval_q4
-ballast eval -m qwen3:8b-q6_K   --limit 500 --outdir eval_q6
+ballast eval -m qwen3.5:4b-q4_K_M --limit 200 --outdir eval_q4
+ballast eval -m qwen3.5:4b-q8_0   --limit 200 --outdir eval_q8
 ```
 
 Read the two summaries side by side:
 
 - **U dropped but S held** (ungrounded down, evidence-in-hand accuracy
-  intact) → the quant is merely forgetful. Ballast it and carry on — this is
-  the cheap case.
+  intact): the quant is merely forgetful. Ballast it and carry on.
 - **S collapsed too** (the model can't convert evidence into answers
-  anymore) → reading is damaged, and no corpus buys it back. Use a bigger
-  quant; in our sweep the cliff sat between Q6_K and the 4-bit formats, and
+  anymore): reading is damaged and no corpus buys it back. Use a bigger
+  quant. In our sweep the cliff sat between Q6_K and the 4-bit formats, and
   Q6_K was free on every model measured.
 
 **How this differs from KL-divergence.** The standard quant check (llama.cpp's
-`--kl-divergence`, perplexity deltas) measures how far the quantized model's
-token distributions drift from the full-precision model's, averaged over
-generic text. That's a *fidelity* number: it tells you the outputs changed,
-not which capability broke — and it needs the full-precision reference loaded
-alongside, which at 12B+ is exactly the model you couldn't run. The grounded
-diagnostic is *functional* and it decomposes: U isolates recall, S isolates
-reading, and the two fail independently in the wild — we measured a double
-dissociation (one model quantizes to recall-intact/reading-damaged, another
-to reading-intact/recall-damaged) that any single drift scalar is blind to
-by construction, since both modes just look like "distribution moved." KL
-answers "did quantization change this model?"; the two-arm readout answers
-"can I fix what it lost by shipping facts, or is the reader broken?" — which
-is the decision you're actually making.
+`--kl-divergence`, perplexity deltas) measures how far the quant's token
+distributions drift from the full-precision model's, averaged over generic
+text. That is a *fidelity* number: it says the outputs changed, not which
+capability broke. It also needs the full-precision reference loaded
+alongside, and at 12B+ that is exactly the model you couldn't run. The
+grounded readout is *functional*: U isolates recall, S isolates reading, and
+the two fail independently. In our sweep one model quantized to
+recall-intact/reading-damaged and another to the reverse; a single drift
+scalar can't tell those apart. KL asks "did quantization change this model?"
+This asks "can I ship facts to fix it, or is the reader broken?"
 
-Measured background — which models cliff, why parameter count won't predict
-it, and the double dissociation:
-[results-quantization](docs/results-quantization.md).
+Which models cliff, why parameter count won't predict it, and the full
+sweep: [results-quantization](docs/results-quantization.md).
+
+One instrument note, because it matters. `ballast eval` is the *deployment*
+instrument: open-ended generation through your own runtime, graded by
+answer containment. The tables in [The numbers](#the-numbers) come from a
+different instrument, logprob multiple choice in our research harness,
+which is not public ([methodology](docs/methodology.md)). Same U/R/S
+decomposition, different measurement: generative scores land far lower,
+and a CLI run cannot land on any figure in this README even in principle.
+Compare your two summaries with each other, nothing else.
+
+### 2. Ballast a model for local use (one more command)
+
+```bash
+uvx openballast serve              # grounding proxy :11435 + MCP :11436
+```
+
+Point your client at `http://localhost:11435/v1` instead of `:11434`. That's
+the whole setup. Every chat request gets relevant facts prepended before your
+model sees it; streaming and everything else passes through untouched.
+
+First live A/B on a 0.5B model, asked "Where was Douglas Adams born?" On its
+own: *Dublin*. Through the proxy: *Cambridge*.
+
+**What the proxy does not protect you from:** on questions with no true
+answer (false premises, facts nobody recorded), injected evidence makes
+fabrication *worse*, not better; we measured 24% → 41% on our unanswerable
+suite, rising with corpus coverage
+([results-hallucination](docs/results-hallucination.md)). The proxy grounds
+every request unconditionally, which is exactly the measured-worse
+configuration. An answerability guard is characterized in that doc and not
+shipped yet; until it is, treat proxied answers to
+maybe-nothing-exists-here questions with the same suspicion as raw ones.
 
 ### Plug into MCP clients
 
-Claude Desktop, LM Studio, Cline, Goose — add:
+Claude Desktop, LM Studio, Cline, Goose. Add:
 
 ```json
 { "ballast": { "command": "uvx", "args": ["openballast", "mcp"] } }
 ```
 
-The server exposes `resolve`, `evidence`, and `lookup` — identical to the
+The server exposes `resolve`, `evidence`, and `lookup`, identical to the
 hosted demo endpoint.
 
 ### Pick a knowledge size
 
-Levels nest like weight quants: L0 (52 MB download) through L7 (2.2 GB,
+Levels nest like weight quants: L0 (54 MB download) through L7 (2.3 GB,
 everything). `pull --level 5` after `--level 3` fetches only the new buckets.
-The value curve is steep at the start — the first 100 MB is worth ≈14× the
-last 100 MB — so small levels buy most of the benefit. Sizes:
+The value curve is steep at the start (the first 100 MB is worth ≈14× the
+last 100 MB), so small levels buy most of the benefit. Sizes:
 [ballast-t0 card](https://huggingface.co/datasets/OpenBallast/ballast-t0).
 
 ### Bring your own corpus
@@ -134,27 +164,27 @@ levels; without it the level knob is a no-op.
 ### Profile your model
 
 ```bash
-ballast profile -m qwen3:8b --limit 2000 --budget 2GB
+ballast profile -m qwen3.5:9b --limit 2000 --budget 2GB
 ```
 
 Probes the model ungrounded through your OpenAI-compatible upstream (Ollama,
-LM Studio, llama.cpp, vLLM — no weights are ever loaded by the CLI), reports
-accuracy per corpus region (head → tail), writes a grounding competence
-profile (`.gcp.json`) with a reliability AUC, and — given a byte budget —
+LM Studio, llama.cpp, vLLM; the CLI never loads weights), reports accuracy
+per corpus region from head to tail, and writes a grounding competence
+profile (`.gcp.json`) with a reliability AUC. Given a byte budget, it
 recommends the corpus level where grounding still buys accuracy for *this*
 model.
 
-### Measure what grounding actually delivers
+### Measure what grounding delivers
 
 ```bash
-ballast eval -m qwen3:8b --limit 500
+ballast eval -m qwen3.5:9b --limit 500
 ```
 
-The three-arm instrument: every probe asked ungrounded (U), with realized
-retrieval (R), and with oracle-entity evidence (S). The headline output is
-the delivery ratio (R − U) / (S − U) — the fraction of the reachable
-knowledge gap your retrieval actually closes. Arms checkpoint to parquet and
-resume after interruption.
+Every probe is asked three ways: ungrounded (U), with realized retrieval
+(R), and with oracle-entity evidence (S). The headline output is the
+delivery ratio (R − U) / (S − U): the fraction of the reachable knowledge
+gap your retrieval closes. Arms checkpoint to parquet and resume after
+interruption.
 
 ### Query the data directly
 
@@ -187,7 +217,7 @@ real downloads live on Hugging Face.
 
 A language model is two things fused together: an engine that can reason and
 read, and an encyclopedia it memorized at training time. Most of what you buy
-with a bigger model is the encyclopedia — and parameters are the most
+with a bigger model is the encyclopedia, and parameters are the most
 expensive place to store facts. Ballast splits them: the facts ship as a
 plain file next to the model, sized like a quant, updated by swapping the
 file.
@@ -199,11 +229,11 @@ The objections, measured:
   always capable; it never had room to store the facts.
 - **"It makes things up."** Grounding cuts hallucination 24% → 7% on that
   model, and 3–20× on two-hop questions where no single line contains the
-  answer. The honest limit: on unanswerable questions (false premises, facts
-  nobody recorded), evidence *raises* fabrication — a page about the right
+  answer. The limit: on unanswerable questions (false premises, facts
+  nobody recorded), evidence *raises* fabrication; a page about the right
   person reads as permission to answer
   ([results-hallucination](docs/results-hallucination.md)).
-- **"It answered wrong — can it notice?"** Cheaply, sometimes: a string test
+- **"Can it notice when it's wrong?"** Sometimes, cheaply: a string test
   checks whether the answer is supported by the evidence it saw; unsupported
   answers get one retry against a recall-first pack. +4.30 points on the
   development population, +3.62 held-out, and it almost never breaks a
@@ -220,22 +250,26 @@ The objections, measured:
   is 6× fewer parameters per token, with one shared knowledge file per
   cluster instead of a copy in every GPU's weights.
 
-**Isn't this just RAG?** Mechanically yes — look something up, put it in the
-prompt. What's different: the knowledge comes in *sizes* (a measured
-knowledge-per-byte dial, not a vector database you maintain), it's *one
-public versioned file* anyone can pin or diff, and the finding is an
-*exchange rate* — how many corpus bytes buy what a parameter byte buys
+**Isn't this just RAG?** Mechanically yes: look something up, put it in the
+prompt. Three differences. The knowledge comes in *sizes* (a measured
+knowledge-per-byte dial, not a vector database you maintain). It's *one
+public versioned file* anyone can pin or diff. And the finding is an
+*exchange rate*: how many corpus bytes buy what a parameter byte buys
 (40–100× at full precision, ≈15× against the cheapest intact quant).
 "Retrieval helps" isn't news; the price of a fact is.
 
 ## The numbers
 
-Protocol note, stated once: these are 8-way multiple-choice scores read from
-the model's token probabilities with an abstain option — open-ended
-generative use scores lower across the board (measured separately in
-[results-retrieval](docs/results-retrieval.md)). Full tables:
-[results-equal-bytes](docs/results-equal-bytes.md); method:
-[methodology](docs/methodology.md).
+Two regimes, stated up front. The tables below are 8-way multiple choice
+read from token probabilities with an abstain option, from our research
+harness (not the CLI; [methodology](docs/methodology.md)). They isolate
+recall vs reading; they are not deployment accuracy. The deployment-shaped
+measurement is open-ended generation with real retrieval, and it is much
+lower: Qwen3.5-9B-Base went 0.154 raw → 0.289 with one-pass retrieval →
+0.331 with a verify-and-retry second pass, against a 0.681 oracle-evidence
+ceiling ([results-retrieval](docs/results-retrieval.md)). Both regimes
+show the same structure; only the multiple-choice one shows it this
+cleanly. Full tables: [results-equal-bytes](docs/results-equal-bytes.md).
 
 ![The whole ladder: every model in both families as a raw-to-ballasted dumbbell. Raw floors spread from 0.32 to 0.68; ballasted ceilings cluster between 0.77 and 0.91.](assets/figures/ladder.png)
 
@@ -252,19 +286,19 @@ generative use scores lower across the board (measured separately in
 | Qwen3.5-4B | 43% | **83%** | 47% → **10%** |
 | Qwen3.5-9B | 54% | 82% | 33% → 11% |
 
-Raw floors spread; grounded ceilings compress — and the **ballasted 4B edges
+Raw floors spread; grounded ceilings compress. The **ballasted 4B edges
 past the ballasted 9B**. What separates model sizes factually is mostly
-memorization, and that part can be bought back cheaply.
+memorization, and that part is cheap to buy back.
 
 **The lookup is real, and priced in.** Headline tables usually assume perfect
 entity resolution. We built a deliberately simple linker (no embeddings, no
 model calls) and measured it: it delivers about two thirds of the ideal
-benefit, and the crossings quoted here — 470 MB to beat the raw 12B — already
+benefit, and the crossings quoted here (470 MB to beat the raw 12B) already
 include that. A wrong lookup turned out nearly harmless (the model ignores
 irrelevant facts), so recall, not precision, is what pays
 ([results-retrieval](docs/results-retrieval.md)).
 
-**If you run quantized models:** 4-bit breaks some models and not others —
+**If you run quantized models:** 4-bit breaks some models and not others.
 E4B collapses (66% → 49% raw, 91% → 65% grounded) while E2B and 12B barely
 move, on both nf4 and GGUF Q4_K_M; Q6_K was free on every model measured.
 Grounded accuracy is the diagnostic: a forgetful model recovers when handed
@@ -273,38 +307,38 @@ evidence, a damaged one doesn't
 
 ![Chart: raw and ballasted accuracy across bf16, fp8, Q6_K, Q4_K_M and nf4. The 12B lines are flat everywhere; the E4B lines plunge between Q6_K and the two 4-bit formats.](assets/figures/quant_cliff.png)
 
-The same sweep on Qwen3.5 shows the other outcome: no cliff anywhere — raw
+The same sweep on Qwen3.5 shows the other outcome: no cliff anywhere. Raw
 floors and grounded ceilings stay flat from bf16 down to nf4 (worst ceiling
 loss 5.6 points against E4B's 26). The catastrophic mode belongs to
-particular models, not to 4-bit itself — which is exactly why you test your
-quant instead of trusting the format:
+particular models, not to 4-bit itself. Test your quant; don't trust the
+format:
 
-![Chart: the Qwen3.5 dose-response — 4B and 9B raw floors and ballasted ceilings essentially flat across bf16, Q6_K, Q4_K_M and nf4.](assets/figures/quant_cliff_qwen.png)
+![The Qwen3.5 dose-response: 4B and 9B raw floors and ballasted ceilings essentially flat across bf16, Q6_K, Q4_K_M and nf4.](assets/figures/quant_cliff_qwen.png)
 
 **The thing that didn't work:** per-model personalized corpora. We can
 predict a model's blind spots from corpus features (AUC ≈ 0.8), and families
-genuinely differ — yet generic selection won at every equal-bytes level. The
+genuinely differ. Generic selection still won at every equal-bytes level. The
 corpus can tell you what a model doesn't know; it cannot tell you what people
 will ask ([results-boost](docs/results-boost.md)).
 
 ## Docs
 
-- [THESIS.md](THESIS.md) — the research overview: thesis, headline numbers,
-  every caveat
-- [docs/results-equal-bytes.md](docs/results-equal-bytes.md) — accuracy
+- [THESIS.md](THESIS.md): the research overview, headline numbers, every
+  caveat
+- [docs/results-equal-bytes.md](docs/results-equal-bytes.md): accuracy
   ladders and the corpus-vs-parameters exchange rate
-- [docs/results-quantization.md](docs/results-quantization.md) — quantization
+- [docs/results-quantization.md](docs/results-quantization.md): quantization
   vs recall vs reading; the Q6_K verdict
-- [docs/results-boost.md](docs/results-boost.md) — the personalized-corpus
+- [docs/results-boost.md](docs/results-boost.md): the personalized-corpus
   negative result
-- [docs/results-hallucination.md](docs/results-hallucination.md) — where
+- [docs/results-hallucination.md](docs/results-hallucination.md): where
   grounding cuts hallucination and where it raises fabrication
-- [docs/results-retrieval.md](docs/results-retrieval.md) — the real-lookup
+- [docs/results-retrieval.md](docs/results-retrieval.md): the real-lookup
   measurement and the two-pass support check
-- [docs/methodology.md](docs/methodology.md) — probes, composition trick,
+- [docs/methodology.md](docs/methodology.md): probes, composition trick,
   registered bands
-- [docs/artifact.md](docs/artifact.md) — corpus layout and loading
-- [docs/mcp.md](docs/mcp.md) — demo endpoint reference
+- [docs/artifact.md](docs/artifact.md): corpus layout and loading
+- [docs/mcp.md](docs/mcp.md): demo endpoint reference
 
 ## Roadmap
 
@@ -312,11 +346,11 @@ will ask ([results-boost](docs/results-boost.md)).
   (T1), and CC BY (T2), tracked per record; the remaining step is choosing a
   license policy at download time ("commercial-safe, no share-alike") and
   getting an artifact that satisfies it.
-- **Bring-your-own-corpus as a contract.** `ballast build` ships; publishing
-  the artifact format and loader contract properly — so anyone can build a
-  ballast with none of our tooling in the loop — is next.
+- **Bring-your-own-corpus as a contract.** `ballast build` ships; next is
+  publishing the artifact format and loader contract so anyone can build a
+  ballast with none of our tooling in the loop.
 - **Keep profiling new models.** The instrument is cheap; state-of-the-art
   open models get measured as they land.
 
-Docs are CC-BY-4.0. Corpus licenses per artifact (CC0 / CC BY-SA / CC BY —
-thanks to the Wikidata, Wikipedia, and OpenStax contributors).
+Docs are CC-BY-4.0. Corpus licenses per artifact: CC0 / CC BY-SA / CC BY.
+Thanks to the Wikidata, Wikipedia, and OpenStax contributors.

@@ -1,6 +1,6 @@
 # Ballast: Quantize the Weights, Ballast the Knowledge
 
-*OpenBallast — working notes, v0.3 (August 2026). Numbers below are measured, not projected. This document is the overview; the full result write-ups live in [docs/](docs/).*
+*OpenBallast — working notes, v0.3 (August 2026). Numbers below are measured, not projected; they come from our research harness, which is not public. The published CLI ships a different, deployment-regime instrument and will not reproduce them (see [methodology](docs/methodology.md)). This document is the overview; the full result write-ups live in [docs/](docs/).*
 
 ---
 
