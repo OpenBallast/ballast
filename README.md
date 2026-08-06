@@ -79,8 +79,24 @@ Read the two summaries side by side:
   quant; in our sweep the cliff sat between Q6_K and the 4-bit formats, and
   Q6_K was free on every model measured.
 
-Measured background — which models cliff and why parameter count won't
-predict it: [results-quantization](docs/results-quantization.md).
+**How this differs from KL-divergence.** The standard quant check (llama.cpp's
+`--kl-divergence`, perplexity deltas) measures how far the quantized model's
+token distributions drift from the full-precision model's, averaged over
+generic text. That's a *fidelity* number: it tells you the outputs changed,
+not which capability broke — and it needs the full-precision reference loaded
+alongside, which at 12B+ is exactly the model you couldn't run. The grounded
+diagnostic is *functional* and it decomposes: U isolates recall, S isolates
+reading, and the two fail independently in the wild — we measured a double
+dissociation (one model quantizes to recall-intact/reading-damaged, another
+to reading-intact/recall-damaged) that any single drift scalar is blind to
+by construction, since both modes just look like "distribution moved." KL
+answers "did quantization change this model?"; the two-arm readout answers
+"can I fix what it lost by shipping facts, or is the reader broken?" — which
+is the decision you're actually making.
+
+Measured background — which models cliff, why parameter count won't predict
+it, and the double dissociation:
+[results-quantization](docs/results-quantization.md).
 
 ### Plug into MCP clients
 
@@ -291,18 +307,6 @@ will ask ([results-boost](docs/results-boost.md)).
   ballast with none of our tooling in the loop — is next.
 - **Keep profiling new models.** The instrument is cheap; state-of-the-art
   open models get measured as they land.
-
-## Status
-
-Research phase, published as it lands. Done: two model families end to end,
-the full quantization sweep (bf16, fp8, Q6_K, Q4_K_M, nf4), the real-lookup
-measurement, the personalized-corpus attempt (failed, informatively), the
-hallucination suite, and the retrieval research line — concluded with the
-two-pass support check validated on a held-out population. All four corpus
-tiers are on Hugging Face; the CLI (`pull` / `serve` / `mcp` / `build` /
-`profile` / `eval`) is on PyPI. Open lines: a verification signal for
-supported-but-wrong answers, match-side retrieval, and coverage beyond
-structured facts.
 
 Docs are CC-BY-4.0. Corpus licenses per artifact (CC0 / CC BY-SA / CC BY —
 thanks to the Wikidata, Wikipedia, and OpenStax contributors).
