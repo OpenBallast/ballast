@@ -20,7 +20,7 @@ suite, across two model families:**
   model from a big one, factually, is mostly what it memorized, not what it can
   do.
 - Made-up answers drop from 24% to 7%. But on questions with no true answer,
-  evidence makes fabrication *worse* (24% to 41% on the largest model). This
+  evidence makes fabrication *worse* (24% to 41% on the 12B). This
   fixes answerable questions; it does not teach a model to abstain.
 - 4-bit quantization damages some models and not others, unpredictably from
   size. Accuracy *with* evidence tells you which case you're in: a forgetful
@@ -84,7 +84,18 @@ model a page about the right person seems to read as permission to answer, even
 when the page doesn't contain the answer.
 
 So this fixes questions that have answers. It does not teach a model to say "I
-don't know."
+don't know." Full write-up: [docs/results-hallucination.md](docs/results-hallucination.md).
+
+### *"It answered wrong — can it notice?"*
+
+Sometimes, and cheaply: after the model answers, a plain string test checks
+whether the answer is actually supported by the evidence it was given;
+unsupported answers get one retry against a deeper, recall-first evidence pack.
+That two-pass check added **+4.30** accuracy points on the population it was
+developed on and **+3.62** on a held-out one, with the retry almost never
+breaking an already-correct answer. The honest limit: it catches answers the
+evidence never supported, not answers that are supported *and* wrong — details
+in [docs/results-retrieval.md](docs/results-retrieval.md).
 
 ### *"My GPU only has 8/12/16 GB."*
 
@@ -138,7 +149,7 @@ cluster, instead of paying for it in every GPU.
   Models age much faster in what they know than in what they can do, so an old
   model may have more life left in it than you'd think.
 - **Researchers.** 50k probes, full methodology, caveats documented. Start with
-  [THESIS.md](THESIS.md).
+  [THESIS.md](THESIS.md), then the topic write-ups under [docs/](docs/).
 
 ## "Isn't this just RAG?"
 
@@ -166,7 +177,9 @@ Questions, TriviaQA, and a set we generated ourselves to sidestep
 contamination. One honest note on protocol: these are 8-way multiple-choice
 scores read from the model's probabilities (no generation, no judge model),
 with an abstain option — open-ended generative use scores lower across the
-board. Full tables, method, and caveats in [THESIS.md](THESIS.md).
+board. Full tables in [docs/results-equal-bytes.md](docs/results-equal-bytes.md),
+method in [docs/methodology.md](docs/methodology.md), caveats in
+[THESIS.md](THESIS.md).
 
 | model | on its own | with the full 1.5 GB file | made-up answers, before → after |
 |---|---|---|---|
@@ -213,7 +226,8 @@ engineering problem.
 
 With the real lookup in the loop, the headline holds: a 2B with the full file
 beats a 12B on its own, comfortably — still roughly 40× cheaper per byte than
-the full-precision parameter route, ~15× against the quantized one.
+the full-precision parameter route, ~15× against the quantized one. Full
+measurement: [docs/results-retrieval.md](docs/results-retrieval.md).
 
 ### If you run quantized models, this part is for you
 
@@ -257,6 +271,9 @@ evidence is still the test that tells you which case you have.
 
 ![Chart: raw and ballasted accuracy across bf16, fp8, Q6_K, Q4_K_M and nf4. The 12B lines are flat everywhere; the E4B lines plunge between Q6_K and the two 4-bit formats.](assets/figures/quant_cliff.png)
 
+The full sweep, including a second model family where the ~4-bit story inverts,
+is in [docs/results-quantization.md](docs/results-quantization.md).
+
 ### The thing that didn't work
 
 The obvious next idea: instead of one corpus for everybody, build each model a
@@ -277,13 +294,13 @@ obscure facts the model didn't know and nobody asks about, while dropping common
 facts it also didn't know. When we cheated and used the actual questions to
 select, 0.9 MB closed twice the model-to-model gap that 107 MB of generic
 corpus closed. So the ceiling is real. It just isn't reachable from the corpus
-side.
+side. Full write-up: [docs/results-boost.md](docs/results-boost.md).
 
 ## Get it
 
 | what | where |
 |---|---|
-| **`ballast` CLI** (download the corpus, plug it into Ollama or any MCP client) | [github.com/OpenBallast/ballast-cli](https://github.com/OpenBallast/ballast-cli) |
+| **`ballast` CLI** (`pull`/`serve` the corpus into Ollama or any MCP client; `build` your own corpus, `profile` a model, `eval` the three-arm benchmark) | [github.com/OpenBallast/ballast-cli](https://github.com/OpenBallast/ballast-cli) |
 | **The corpus** (25.4M entities, 197M facts, levels L0–L7) | [huggingface.co/datasets/OpenBallast/ballast-t0](https://huggingface.co/datasets/OpenBallast/ballast-t0) |
 | **The question sets** (50k probes) | [huggingface.co/datasets/OpenBallast/ballast-evalsets](https://huggingface.co/datasets/OpenBallast/ballast-evalsets) |
 | **Live demo endpoint** (MCP + HTTP) | [mcp.openballast.org](https://mcp.openballast.org), reference in [docs/mcp.md](docs/mcp.md) |
@@ -296,6 +313,14 @@ Against a local Ollama. This is the whole setup:
 uvx openballast pull --level 3
 uvx openballast serve
 # point your client at http://localhost:11435/v1 instead of :11434, and that's it
+```
+
+The CLI also covers the rest of the loop:
+
+```bash
+ballast build <dir>      # turn your own documents into a ballast (bring-your-own-corpus)
+ballast profile -m <model>   # profile a model: what it knows raw vs what it reads from evidence
+ballast eval -m <model>      # the three-arm benchmark (ungrounded / realized / saturated)
 ```
 
 (Or `pip install openballast`. Source: [github.com/OpenBallast/ballast-cli](https://github.com/OpenBallast/ballast-cli).)
@@ -314,8 +339,20 @@ host your own for $0. The real downloads live on Hugging Face.
 
 ## Docs
 
-- [THESIS.md](THESIS.md): the research version, with methodology, every number
-  and every caveat
+- [THESIS.md](THESIS.md): the research overview — thesis, headline numbers,
+  every caveat
+- [docs/results-equal-bytes.md](docs/results-equal-bytes.md): the accuracy
+  ladders and the corpus-vs-parameters exchange rate
+- [docs/results-quantization.md](docs/results-quantization.md): what
+  quantization does to recall vs reading, and the Q6_K verdict
+- [docs/results-boost.md](docs/results-boost.md): the personalized-corpus
+  negative result
+- [docs/results-hallucination.md](docs/results-hallucination.md): where
+  grounding cuts hallucination and where it makes fabrication worse
+- [docs/results-retrieval.md](docs/results-retrieval.md): the real-lookup
+  measurement and the two-pass support check
+- [docs/methodology.md](docs/methodology.md): probes, the composition trick,
+  registered bands
 - [docs/artifact.md](docs/artifact.md): what's in the corpus and how to load it
 - [docs/mcp.md](docs/mcp.md): demo endpoint reference
 
@@ -331,18 +368,21 @@ host your own for $0. The real downloads live on Hugging Face.
   Licenses are tracked per record, and you'll be
   able to say what you're willing to accept at download time, for example
   "commercial use only, no share-alike," and get an artifact that satisfies it.
-- **Bring your own corpus.** The format and the loader contract get published so
-  anyone can turn their own documents, or their national statistics office, into
-  a ballast without waiting for us.
+- **Bring your own corpus.** `ballast build <dir>` already turns a directory of
+  your own documents into a ballast; publishing the format and loader contract
+  properly — so anyone can build one with no part of our tooling in the loop —
+  is the remaining step.
 
 ## Status
 
-Research phase, published as it lands. Done: two model families end to end, the
-full quantization sweep on the pivots (bf16, fp8, GGUF Q6_K and Q4_K_M, nf4),
-the real-lookup measurement, the personalized-corpus attempt (which failed,
-informatively), and the hallucination experiments. Still running: models above
-12B and their quant ladders. We intend to keep profiling
-state-of-the-art open-source models as they come out. Tooling for building your
-own corpus will be open-sourced separately.
+Research phase, published as it lands. Done: two model families end to end
+(through the Qwen3.5 quant grid), the full quantization sweep on the pivots
+(bf16, fp8, GGUF Q6_K and Q4_K_M, nf4), the real-lookup measurement, the
+personalized-corpus attempt (which failed, informatively), the hallucination
+experiments, and the retrieval research line — concluded with the two-pass
+support check validated on a held-out population. Open lines: a verification
+signal for supported-but-wrong answers, match-side retrieval work, and corpus
+coverage beyond structured facts. We intend to keep profiling
+state-of-the-art open-source models as they come out.
 
 Docs are CC-BY-4.0. The corpus is CC0 (thanks to Wikidata's contributors).

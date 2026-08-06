@@ -1,0 +1,68 @@
+# Weight quantization: cliffs, dissociations, and the Q6_K verdict
+
+*Part of the [OpenBallast working notes](../THESIS.md). Protocol: [methodology](methodology.md). The nf4 axis is kept separate so nf4 damage is never silently compared to bf16.*
+
+## The nf4 ladder
+
+| model @ nf4 | raw (Δ vs bf16) | + full ballast (Δ vs bf16) |
+|---|---|---|
+| Gemma-4-E2B | 0.587 (−0.021) | 0.842 (−0.026) |
+| Gemma-4-E4B | 0.485 (**−0.177**) | 0.650 (**−0.260**) |
+| Gemma-4-12B | 0.673 (−0.010) | 0.903 (−0.007) |
+| Gemma-4-31B | 0.732 (no bf16 ref) | 0.934 (no bf16 ref) |
+
+The 31B is the ladder top and runs only at nf4 — 17.8 GB of weights against a 32.6 GB card, with no bf16 reference possible on this hardware, so its row carries no delta. It behaves like the 12B rather than the E4B: highest raw floor (0.732) and highest ceiling (0.934) in the project, hallucination rate 0.146 → 0.031 under full ballast. Scale does not confer immunity to the E4B-style cliff — E2B and 12B and 31B all ride nf4 while the 4.5B member between them does not — but nothing at this size showed the failure.
+
+## Dose–response on the pivots
+
+The full pivot sweep (E4B, 12B at bf16 / fp8 / GGUF K-quants / nf4, ordered by bits per weight):
+
+| quant | bits/wt | E4B raw → ballasted | 12B raw → ballasted |
+|---|---|---|---|
+| bf16 | 16 | 0.662 → 0.910 | 0.683 → 0.910 |
+| fp8 | 8 | 0.632 → 0.841 | 0.677 → 0.906 |
+| Q6_K | ~6.6 | 0.655 → 0.908 | 0.681 → 0.910 |
+| Q4_K_M | ~4.8 | 0.504 → **0.716** | 0.673 → 0.905 |
+| nf4 | ~4.5 | 0.485 → **0.650** | 0.673 → 0.903 |
+
+![Raw floor and ballasted ceiling per quant level. The 12B lines are flat across all five levels; E4B's lines plunge between Q6_K and Q4_K_M — the cliff.](../assets/figures/quant_cliff.png)
+
+*The cliff, located: E4B (blue) is intact through Q6_K and collapses at the ~4-bit levels, on both its raw floor (dashed) and its ballasted ceiling (solid). 12B (orange) is flat everywhere. Note fp8 denting E4B's ceiling while the lower-bit Q6_K does not — format matters, not just bits.*
+
+![Full rate-distortion curve family per model across the five quant levels. E4B's Q6_K curve sits exactly on bf16 while Q4_K_M and nf4 run parallel but far below; all five 12B curves coincide.](../assets/figures/quant_curves.png)
+
+*The same cells as full curves. E4B's Q6_K (green) is indistinguishable from bf16 (blue, underneath it) at every corpus size; the two ~4-bit curves rise in parallel but never recover — a damaged reader gains from evidence at the same rate, from a permanently lower base. Every 12B curve coincides.*
+
+The 12B's grounded ceiling is untouched across the entire sweep, K-quants included (worst case 0.910 → 0.903). E4B's collapses with quantization depth — but by format, not monotonically by bits: Q6_K at ~6.6 bits is indistinguishable from bf16 on both floor and ceiling (0.655 → 0.908), while fp8 at a full eight bits already dents the ceiling (0.841). At the ~4-bit level both format families break E4B the same way — Q4_K_M 0.504 → 0.716, nf4 0.485 → 0.650. The K-quant is marginally gentler, but the collapse class is identical: for E4B the cliff edge sits between ~6.6 and ~4.8 bits regardless of whether the quantizer is llama.cpp's K-quant blocks or bitsandbytes nf4.
+
+Two lessons. First, quantization damage is architecture-dependent, not size-monotonic: E2B and 12B ride even Q4_K_M nearly free while E4B falls off a cliff. Second — and the important one for this thesis — when quantization damages the *engine*, ballast cannot buy it back: E4B's grounded ceiling collapses along with its raw floor under both 4-bit formats (0.716 at Q4_K_M, 0.650 at nf4), i.e. deep quantization broke its ability to read evidence, and no amount of corpus fixes a broken reader. The community's "Q4 made it unusable" experience and the "Q4 is free" experience are both real; they happen on different models, and the grounded ceiling is the diagnostic that tells them apart. Corollary: at nf4 the *smaller* Gemma is strictly better once ballasted (0.842 vs 0.650), and E2B@nf4 + full ballast — under 3 GB of total footprint — beats the raw 12B bf16 (0.842 vs 0.683 on ~24 GB) and, at 7.2 GB, the raw 31B@nf4 on 17.8 GB ([equal-bytes crossings](results-equal-bytes.md)).
+
+## Cross-family: the cliff is lineage-specific, the diagnostic is not
+
+Everything above is one model family, so the same axis was run on Qwen3.5's two nearest pivots (4B and 9B Base — the analogs of E4B and 12B). Q6_K and Q4_K_M have no public *base* GGUFs and transformers has no `qwen35` GGUF architecture mapping at all, so both were self-converted with llama.cpp and loaded through a reverse mapping written for this project (roundtrip-verified against the original weights tensor-by-tensor before any cell was scored; worst relative error 4.5e-07, i.e. f16 rounding and nothing else).
+
+| quant | bits/wt | Qwen3.5-4B raw → ballasted | Qwen3.5-9B raw → ballasted |
+|---|---|---|---|
+| bf16 | 16 | 0.434 → 0.831 | 0.542 → 0.819 |
+| Q6_K | ~6.6 | 0.439 → 0.833 | 0.544 → 0.822 |
+| Q4_K_M | ~4.8 | **0.437** → **0.775** | 0.523 → 0.804 |
+| nf4 | ~4.5 | 0.426 → 0.815 | **0.507** → **0.826** |
+
+**No E4B-style cliff appears in Qwen3.5.** Nothing here collapses: the worst ceiling loss is 5.6 points, against E4B's 26. The catastrophic mode is a property of that lineage, not of 4-bit quantization, and the honest scope of the cliff result is "some models fall off a cliff, and you cannot tell which from size or bit-count."
+
+**What these four cells show instead is a double dissociation between recall and reading.** The two bolded cells are mirror images:
+
+- *Qwen3.5-4B at Q4_K_M* keeps its raw floor exactly (0.437 vs bf16 0.434 — inside noise, nominally higher) and loses 5.6 points of ballasted ceiling. Recall intact, reading damaged.
+- *Qwen3.5-9B at nf4* loses 3.5 points of raw floor (0.507 vs 0.542) and its ballasted ceiling does not move at all (0.826 vs 0.819, nominally higher). Reading intact, recall damaged.
+
+Each capability is damaged in one cell and spared in the other, so this is not one underlying quantity measured two ways: **the ability to recall a fact from weights and the ability to read a fact from context are separately damageable by weight quantization.** That is the empirical basis for the whole thesis — if the two were one capability, moving knowledge out of the weights could not work — and it is also why the two measurements are not interchangeable in practice. A raw benchmark sees the second cell's loss and calls the first cell free; a grounded probe sees the opposite. Both are needed, and neither substitutes for the other.
+
+The 9B/nf4 cell is the thesis's mechanism in miniature: quantization deleted memorized facts, ballast supplied them back, and the result matched the unquantized model at ~28% of its weight bytes. That is "quantize the weights, ballast the knowledge" running as a measurement rather than a slogan — but note it is one cell out of eight, not a law.
+
+**The format ranking inverts between families.** On Gemma-E4B, nf4 was the worse of the two ~4-bit formats (ceiling 0.650 vs Q4_K_M's 0.716). On Qwen3.5-4B it is the reverse, and by a factor of three: nf4 costs 1.6 ceiling points, Q4_K_M costs 5.6. "K-quants are gentler than nf4" is therefore not a fact about the formats — it is a per-model interaction, and one that only appears in the grounded measurement.
+
+**Q6_K is free in all six cells measured across both families** (four here, two on the Gemma pivots), on both floor and ceiling, at ~2.4× the compression of bf16. For the deployment question this thesis cares about, that is the practical answer: quantize to Q6_K, spend the saved bytes on ballast, and verify with a grounded probe rather than a raw one — because at the ~4-bit levels the damage is real, model-specific, format-specific, and, in one direction, invisible to the benchmark most people would run.
+
+## A third signature: quantization can scramble, not just shrink
+
+From the miss-set overlap analysis ([details](results-boost.md)): same-model pairs at different quants agree at κ 0.84–0.90 — quantization mostly shrinks knowledge along the same frontier rather than moving it. **Except Gemma-4-E4B at nf4**: κ 0.54 against its own bf16 — nf4 does not merely shrink E4B's knowledge, it *scrambles* it. This is a third independent signature of the cliff, after the raw floor and the grounded ceiling.
