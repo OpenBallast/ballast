@@ -28,6 +28,8 @@ Every result below is read through a three-arm decomposition, run per probe on t
 
 The **delivery ratio DR = (R − U) / (S − U)** measures how much of the knowledge gap the retrieval stack actually delivers: S − U is what the corpus could be worth, R − U is what the pipeline realizes. The decomposition separates "the model can't use the fact" (rare) from "retrieval never delivered it" (the dominant failure), and it is what makes every kill below mechanically attributable.
 
+Protocol and anchors, stated once: the generator throughout Part 2 is **Qwen3.5-9B-Base (int8)**, answering open-ended in ≤24 tokens, graded by normalized alias containment (SQuAD/NQ-open convention) — a different and harder instrument than Part 1's logprob multiple choice, so numbers do not compare across parts. On the 2,000-probe development population (G2 = 1,000 SimpleQA + 1,000 NQ-open): **U = 0.1540**, single-pass R = 0.2885, two-pass R = 0.3315, and the saturated ceiling S = 0.6805 — depressed by benchmark gold noise (roughly a third of official gold passages do not support their official answers as graded), not by the model.
+
 ### The transfer law: ten uniform pack policies, ten kills
 
 Stage F asked whether smarter packing — graph-neighbor expansion, typed Wikidata statements, semantic (cosine) ordering, margin gates — could deliver evidence to the probes the baseline retrieval misses (the "gap" population) without harming the probes it already serves (the "covered" population). Every screen was registered with bands and kill lines before its run. **Ten registered screens were killed on that joint contract**, and the pattern is one law measured from ten angles:
