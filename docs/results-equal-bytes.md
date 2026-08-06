@@ -21,6 +21,8 @@ Grounded ceilings compress (E4B ≈ 12B once ballasted); raw floors spread. Gene
 | Qwen3.5-4B | 0.434 | **0.831** | 0.474 → **0.095** |
 | Qwen3.5-9B | 0.542 | 0.819 | 0.329 → 0.113 |
 
+![Accuracy vs total on-disk bytes for the Qwen3.5 ladder. Every corpus curve tops the parameter-only line; the 0.8B + corpus curve ends above the bare 9B at a sixth of its footprint.](../assets/figures/equal_bytes_qwen.png)
+
 The pattern replicates across an unrelated family, and sharpens: raw floors spread 0.32–0.54 while grounded ceilings land in a 0.77–0.83 band — and the **ballasted 4B beats the ballasted 9B outright** (0.831 vs 0.819). Crossings: 0.8B + 62 MB (L1) exceeds the 4B raw (0.443 vs 0.434); 0.8B + 180 MB (L3) exceeds the 9B raw (0.552 vs 0.542) — both at ideal entity resolution (the realization band, measured on the Gemma family, is in [realized retrieval](results-retrieval.md)) and on margins of ~0.01. The parameter route to that gain is ~16 GB of bf16 weights, a ~90× byte disadvantage. The 0.8B's hallucination rate falls more than 5× (0.601 → 0.114). Families do differ in grounded ceiling (Gemma ~0.91 vs Qwen ~0.82 on the same evidence) — reading ability varies across lineages — but the within-family structure (floors spread, ceilings compress, head-heavy value-per-byte) is identical.
 
 ## Equal-bytes crossings — the headline
@@ -34,6 +36,8 @@ The pattern replicates across an unrelated family, and sharpens: raw floors spre
 | E2B@nf4 reaches 31B@nf4's raw accuracy | **+466 MB** of ballast (L5: 0.769 > 0.732) | +28.7B params ≈ 16.3 GB nf4 | **~35×** |
 
 The last row is the ladder top, added once the 31B cell became runnable ([quantization results](results-quantization.md)): **a 2.3B model carrying 466 MB of corpus beats a 31B model on 7.2 GB of total footprint against 17.8 GB** — the same crossing as the first two rows, now against a model 13× its size and priced at nf4 on both sides rather than against full-precision weights.
+
+![The nf4-family equal-bytes chart, including the 31B: the E2B corpus curve crosses the 31B's starting point.](../assets/figures/equal_bytes_nf4.png)
 
 ![Accuracy vs total on-disk bytes for the Gemma ladder. Each model's corpus spending rises near-vertically while the parameters-only line crawls: bytes of context buy far more accuracy than bytes of parameters.](../assets/figures/equal_bytes.png)
 
