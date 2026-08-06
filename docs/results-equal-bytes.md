@@ -4,6 +4,8 @@
 
 ## The ladder, raw vs ballasted (bf16, 50,147 probes)
 
+![Both families' full ladders as raw-to-ballasted dumbbells: floors spread, ceilings compress.](../assets/figures/ladder.png)
+
 | model | raw accuracy | + full ballast (1.51 GB) | hallucination raw → ballasted |
 |---|---|---|---|
 | Gemma-4-E2B | 0.608 | **0.868** | 0.242 → **0.074** |

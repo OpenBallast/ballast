@@ -237,6 +237,8 @@ generative use scores lower across the board (measured separately in
 [results-equal-bytes](docs/results-equal-bytes.md); method:
 [methodology](docs/methodology.md).
 
+![The whole ladder: every model in both families as a raw-to-ballasted dumbbell. Raw floors spread from 0.32 to 0.68; ballasted ceilings cluster between 0.77 and 0.91.](assets/figures/ladder.png)
+
 | model | on its own | with the full 1.5 GB file | made-up answers |
 |---|---|---|---|
 | Gemma-4-E2B | 61% | **87%** | 24% → **7%** |
