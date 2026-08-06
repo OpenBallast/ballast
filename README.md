@@ -271,6 +271,14 @@ evidence, a damaged one doesn't
 
 ![Chart: raw and ballasted accuracy across bf16, fp8, Q6_K, Q4_K_M and nf4. The 12B lines are flat everywhere; the E4B lines plunge between Q6_K and the two 4-bit formats.](assets/figures/quant_cliff.png)
 
+The same sweep on Qwen3.5 shows the other outcome: no cliff anywhere — raw
+floors and grounded ceilings stay flat from bf16 down to nf4 (worst ceiling
+loss 5.6 points against E4B's 26). The catastrophic mode belongs to
+particular models, not to 4-bit itself — which is exactly why you test your
+quant instead of trusting the format:
+
+![Chart: the Qwen3.5 dose-response — 4B and 9B raw floors and ballasted ceilings essentially flat across bf16, Q6_K, Q4_K_M and nf4.](assets/figures/quant_cliff_qwen.png)
+
 **The thing that didn't work:** per-model personalized corpora. We can
 predict a model's blind spots from corpus features (AUC ≈ 0.8), and families
 genuinely differ — yet generic selection won at every equal-bytes level. The
