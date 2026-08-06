@@ -396,6 +396,24 @@ does not:
   of the 1,885 entities the model actually misses closes 213% of the gap in
   0.9 MB — three orders of magnitude less than the generic corpus needs.
 
+**It replicates on two further arms, chosen to stress it in opposite
+directions.** *E2B→31B* is the widest capability gap in the ladder (+0.143 on
+the EVAL split): generic closes 156% of it at full corpus, the tuned arm 141%,
+and tuned loses at every equal-bytes level (Δ −0.014…−0.131, McNemar p ≈ 0).
+*12B@Q4_K_M→12B@Q6_K* is the **quant-damage buyback** arm — can targeted
+ballast repurchase what quantization deleted? — and it fails the same way
+(Δ −0.009…−0.109, p ≈ 0). Three arms, spanning a 0.9-point gap and a
+14-point one, all decisively negative: the result is not an artifact of the
+pair it was discovered on.
+
+The buyback arm carries a second number worth stating on its own. The gap it
+is trying to close is tiny — 12B loses only 0.9 points to Q4_K_M (§4.6) —
+while the generic corpus adds ~20 points on top, so generic ballast overshoots
+the quantization damage by **~24×** (gap_closed 23.7 at full corpus). The
+practical reading: for a model that rides its quant cleanly, worrying about
+recovering quantization loss is the wrong frame entirely. The corpus dwarfs
+it.
+
 The failure mechanism is visible in the coverage column: at L0 the tuned
 selection grounds 1.5% of probe subjects against the generic prefix's 20.4%.
 Every ingredient of tuned selection works in isolation — competence models
@@ -541,7 +559,10 @@ retrieval time from the artifact alone.
 
 ## 6. What's running now / next
 
-- Boost verdicts for the remaining arms: E2B→31B, and the **quant-damage buyback** arm (12B Q4_K_M → Q6_K: what fraction of quantization's knowledge loss does targeted ballast recover, per MB). (E2B→E4B: measured, §4.8.)
+- Qwen3.6-27B quant cells: nf4 and NVFP4 on the reference box; fp8, bf16 and
+  the K-quants need ≥54 GB of VRAM (§4.6b footnote) and run elsewhere.
+  (All three boost arms — E2B→E4B, E2B→31B, quant-damage buyback: measured,
+  §4.8.)
 - Hallucination-family cells for the Qwen3.5 quant pivots (does the
   reading-damage mode of §4.6b also move the §4.10 curves). (Matrix cells:
   done, §4.6b.)
