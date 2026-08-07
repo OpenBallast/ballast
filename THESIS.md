@@ -44,6 +44,7 @@ Truncation is not a filter — deeper buckets are simply never downloaded, and e
 | Two-pass support routing | +4.30pp (developed) / **+3.62pp held-out**, registered bands, guards held | [retrieval](docs/results-retrieval.md) |
 | Equal-VRAM verdict | 9B + corpus + two-pass 0.3315 vs 12B alone 0.1565 = **+17.50pp** at less VRAM | [retrieval](docs/results-retrieval.md) |
 | Quantization | Q6_K free in all six cells; E4B collapses at ~4-bit (ceiling 0.910 → 0.650) while 12B rides everything; recall and reading are separately damageable | [quantization](docs/results-quantization.md) |
+| Third family at the top | Qwen3.6-27B@nf4 0.430 → **0.857** (+42.7, widest span measured); 30-point raw-floor gap vs Gemma-4-31B@nf4 with identical reading fidelity | [quantization](docs/results-quantization.md) |
 | Tuned ballasts | negative — generic beats model-tuned at every equal-bytes level; oracle closes 213% of the gap in 0.9 MB | [boost](docs/results-boost.md) |
 | Hallucination | composition PASS all 36 readings; unanswerable/false-premise FAIL all 12 cells — fabrication rises with grounding | [hallucination](docs/results-hallucination.md) |
 

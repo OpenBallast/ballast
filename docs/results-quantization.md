@@ -69,6 +69,25 @@ Scope and fragility, before anyone builds on this: the dissociation rests on fou
 
 **Q6_K is free in all six cells measured across both families** (four here, two on the Gemma pivots), on both floor and ceiling, at ~2.4× the compression of bf16. For the deployment question this thesis cares about, that is the practical answer: quantize to Q6_K, spend the saved bytes on ballast, and verify with a grounded probe rather than a raw one — because at the ~4-bit levels the damage is real, model-specific, format-specific, and, in one direction, invisible to the benchmark most people would run.
 
+## A third family at the top: Qwen3.6-27B at nf4
+
+The ladder top was re-run in a third lineage. Qwen3.6-27B is a hybrid linear-attention model that declares itself as the `qwen3_5` architecture, so it loads through the same reverse mapping written for the Qwen3.5 GGUF cells; at nf4 it is 17.3 GB of weights, and like the 31B it has no bf16 reference possible on a 32.6 GB card, so its row carries no delta. Same 50,147 probes, same protocol.
+
+| model @ nf4 | params | raw | + full ballast | hallucination rate |
+|---|---|---|---|---|
+| Gemma-4-31B | 31B | 0.732 | 0.934 | 0.146 → 0.031 |
+| Qwen3.6-27B | 27B | **0.430** | **0.857** | 0.516 → 0.089 |
+
+![Rate–distortion curve for Qwen3.6-27B at nf4: accuracy climbs from a 0.430 raw floor to 0.857 at the full corpus, the widest floor-to-ceiling span measured in the project.](../assets/figures/rate_distortion_qwen36.png)
+
+**+42.7 points is the widest raw-to-ballasted span in the project** — wider than any Gemma cell and wider than the 0.8B Qwen3.5 (+46.0 is the one exception, at the opposite end of the size range). Half the span arrives cheaply: +34.1 of the +42.6 total gain is bought by `buckets 0-6`, i.e. 50.2% of the corpus bytes.
+
+The interesting comparison is the pair above, because it isolates which capability lineage controls. Two models of near-identical size, both at nf4, differ by **30 points of raw floor** (0.430 vs 0.732) — and read supplied evidence indistinguishably well. Restricted to probes whose evidence actually contained the gold answer, the 31B scores 0.967–0.996 across the ten popularity deciles and the 27B scores 0.957–0.991. The entire 30-point gap is recall; reading is near-saturated in both and essentially lineage-invariant. That is the same recall/reading split the Qwen3.5 double dissociation established through quantization damage, appearing here through pretraining differences instead — and it is the split ballast exploits, since only the recall term is the one a corpus can substitute for.
+
+Two confounds keep this from being a clean lineage verdict, and both cut the same way. Qwen3.6-27B is the instruction-tuned release (there is no `-Base` variant published), while every Qwen3.5 cell here is a base model, and base-vs-instruct is known to move closed-book MC probes on its own. Separately, the raw floor of a Qwen model on this template has run low throughout the project (Qwen3.5-9B bf16: 0.542), so part of the 30 points is template interaction rather than stored knowledge. The reading comparison is the robust half of the paragraph; the recall comparison is suggestive.
+
+One methodological note, since this cell is the first at this scale in a third architecture: the two-pass decomposition was re-validated here, not assumed. Re-rendering evidence at cutoffs 1 and 4 and rescoring from scratch reproduces the composed curve to **0.0015 and 0.0008** absolute — the composition trick holds on hybrid linear attention exactly as it does on the Gemma cells.
+
 ## A third signature: quantization can scramble, not just shrink
 
 From the miss-set overlap analysis ([details](results-boost.md)): same-model pairs at different quants agree at κ 0.84–0.90 — quantization mostly shrinks knowledge along the same frontier rather than moving it. **Except Gemma-4-E4B at nf4**: κ 0.54 against its own bf16 — nf4 does not merely shrink E4B's knowledge, it *scrambles* it. This is a third independent signature of the cliff, after the raw floor and the grounded ceiling.
