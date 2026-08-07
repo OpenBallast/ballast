@@ -56,8 +56,21 @@ uvx openballast pull --level 3     # 275 MB download, ~1 GB on disk
 the reference corpus built from Wikidata: 25.4M entities as compact fact
 records, in SQLite serving form. `--level` picks how much of it, L0 (54 MB,
 the most-cited entities) up to L7 (2.3 GB, all of them). The prose tiers
-(t1, t2) are parquet datasets for now, not `pull` targets; for your own
-documents there's `ballast build` below.
+pull the same way:
+
+```bash
+uvx openballast pull --tier t1 --level 3   # Wikipedia prose: 1.6 GB -> 8.7 GB on disk
+uvx openballast pull --tier t2             # 61 OpenStax textbooks: 25 MB
+uvx openballast serve --corpus t1          # serve whichever corpus you pulled
+```
+
+Each tier is its own corpus under `~/.ballast/`; every command takes
+`--corpus`. Passage corpora serve document-prefix evidence packs (4 KB,
+whole chunks). One honest label: entity-name lookup over prose is
+functional but unbenchmarked — the measured prose-retrieval numbers in
+[results-retrieval](docs/results-retrieval.md) come from a two-pass stack
+the CLI does not run yet. For your own documents there's `ballast build`
+below.
 
 ### 1. Diagnose quantization damage
 
@@ -172,11 +185,16 @@ hosted demo endpoint.
 
 ### Pick a knowledge size
 
-Levels nest like weight quants: L0 (54 MB download) through L7 (2.3 GB,
-everything). `pull --level 5` after `--level 3` fetches only the new buckets.
-The value curve is steep at the start (the first 100 MB is worth ≈14× the
-last 100 MB), so small levels buy most of the benefit. Sizes:
-[ballast-t0 card](https://huggingface.co/datasets/OpenBallast/ballast-t0).
+Levels nest like weight quants: t0 runs L0 (54 MB download) through L7
+(2.3 GB, everything), and `pull --level 5` after `--level 3` fetches only
+the new buckets. The value curve is steep at the start (the first 100 MB is
+worth ≈14× the last 100 MB), so small levels buy most of the benefit. t1
+uses the same eight nested levels over Wikipedia prose; t2 is small enough
+to be a single level. `pull` prints the download and on-disk cost before
+fetching; full tables live on each dataset card
+([t0](https://huggingface.co/datasets/OpenBallast/ballast-t0),
+[t1](https://huggingface.co/datasets/OpenBallast/ballast-t1),
+[t2](https://huggingface.co/datasets/OpenBallast/ballast-t2)).
 
 ### Bring your own corpus
 
