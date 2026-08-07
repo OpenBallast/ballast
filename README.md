@@ -72,7 +72,24 @@ ballast eval -m qwen3.5:4b-q4_K_M --limit 200 --outdir eval_q4
 ballast eval -m qwen3.5:4b-q8_0   --limit 200 --outdir eval_q8
 ```
 
-Read the two summaries side by side:
+Each run takes a few minutes on a 16 GB desktop card. What came back on
+ours, Qwen3.5-4B q4_K_M against q8_0 (llama.cpp upstream, thinking
+disabled, 200 probes at corpus level L3):
+
+```
+three-arm instrument: 200 probes, model qwen3.5:4b-q4_K_M, corpus level L3
+U 0.3450  R 0.4000  S 0.4750
+knowledge-limited band +0.1300; delivery ratio 0.423
+
+three-arm instrument: 200 probes, model qwen3.5:4b-q8_0, corpus level L3
+U 0.3500  R 0.3800  S 0.4800
+knowledge-limited band +0.1300; delivery ratio 0.231
+```
+
+This is the healthy case: U held (0.345 vs 0.350) and S held (0.475 vs
+0.480), so q4_K_M costs this model nothing measurable on recall or on
+reading. The R difference is sampling noise at n = 200. The two failure
+signatures to look for:
 
 - **U dropped but S held** (ungrounded down, evidence-in-hand accuracy
   intact): the quant is merely forgetful. Ballast it and carry on.
@@ -80,6 +97,15 @@ Read the two summaries side by side:
   anymore): reading is damaged and no corpus buys it back. Use a bigger
   quant. In our sweep the cliff sat between Q6_K and the 4-bit formats, and
   Q6_K was free on every model measured.
+
+One practical trap: if your model has a thinking mode, disable it for the
+eval (llama.cpp: `--reasoning-budget 0` plus
+`--chat-template-kwargs '{"enable_thinking":false}'`; other runtimes have
+equivalents). A thinking model burns its token budget on reasoning, the
+extracted answers come back empty, and every arm reads near zero. We
+measured exactly that before disabling it: the same q4_K_M scored
+U 0.185 / S 0.215 with thinking on and truncated, U 0.345 / S 0.475 with
+it off.
 
 **How this differs from KL-divergence.** The standard quant check (llama.cpp's
 `--kl-divergence`, perplexity deltas) measures how far the quant's token
@@ -118,15 +144,20 @@ model sees it; streaming and everything else passes through untouched.
 First live A/B on a 0.5B model, asked "Where was Douglas Adams born?" On its
 own: *Dublin*. Through the proxy: *Cambridge*.
 
-**What the proxy does not protect you from:** on questions with no true
-answer (false premises, facts nobody recorded), injected evidence makes
-fabrication *worse*, not better; we measured 24% → 41% on our unanswerable
-suite, rising with corpus coverage
-([results-hallucination](docs/results-hallucination.md)). The proxy grounds
-every request unconditionally, which is exactly the measured-worse
-configuration. An answerability guard is characterized in that doc and not
-shipped yet; until it is, treat proxied answers to
-maybe-nothing-exists-here questions with the same suspicion as raw ones.
+**Unanswerable questions, measured on both instruments.** On questions with
+no true answer (false premises, facts nobody recorded), our research
+protocol found injected evidence makes fabrication *worse* under calibrated
+abstention: 24% → 41%, rising with corpus coverage
+([results-hallucination](docs/results-hallucination.md)). The deployment
+picture is different: a raw chat model simply answers false premises
+(fabrication 0.92 on 150 unanswerable probes from the public evalsets,
+qwen3.5:4b-q4_K_M), grounding drops that to 0.08, and the answerability
+warn line the proxy ships since v0.2.2 drops it again to 0.03, with
+answerable-probe accuracy unchanged (0.300 both arms, n = 150). Same
+corpus, different instruments, different signs; both are real. The guard
+is one sentence of system prompt (warn, never suppress), and the residual
+failure mode remains: evidence about the right entity can still read as
+license to answer.
 
 ### Plug into MCP clients
 
