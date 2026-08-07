@@ -66,8 +66,8 @@ uvx openballast serve --corpus t1          # serve whichever corpus you pulled
 
 Each tier is its own corpus under `~/.ballast/`; every command takes
 `--corpus`. Passage corpora serve document-prefix evidence packs (4 KB,
-whole chunks). One honest label: entity-name lookup over prose is
-functional but unbenchmarked — the measured prose-retrieval numbers in
+whole chunks). Entity-name lookup over prose is functional but
+unbenchmarked: the measured prose-retrieval numbers in
 [results-retrieval](docs/results-retrieval.md) come from a two-pass stack
 the CLI does not run yet. For your own documents there's `ballast build`
 below.
@@ -111,7 +111,7 @@ signatures to look for:
   quant. In our sweep the cliff sat between Q6_K and the 4-bit formats, and
   Q6_K was free on every model measured.
 
-One practical trap: if your model has a thinking mode, disable it for the
+If your model has a thinking mode, disable it for the
 eval (llama.cpp: `--reasoning-budget 0` plus
 `--chat-template-kwargs '{"enable_thinking":false}'`; other runtimes have
 equivalents). A thinking model burns its token budget on reasoning, the
@@ -135,7 +135,7 @@ This asks "can I ship facts to fix it, or is the reader broken?"
 Which models cliff, why parameter count won't predict it, and the full
 sweep: [results-quantization](docs/results-quantization.md).
 
-One instrument note, because it matters. `ballast eval` is the *deployment*
+`ballast eval` is the *deployment*
 instrument: open-ended generation through your own runtime, graded by
 answer containment. The tables in [The numbers](#the-numbers) come from a
 different instrument, logprob multiple choice in our research harness,

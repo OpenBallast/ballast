@@ -3,7 +3,7 @@
 A live, free-to-use instance of the Ballast T0 corpus (levels L0–L5: 4.4M entities,
 62.8M triples, 6.7M name aliases) speaking **MCP over streamable HTTP** plus plain
 GET endpoints. It exists to demonstrate that the knowledge layer costs nothing to
-run — the whole thing is Cloudflare free tier. It is a *demo*: no auth, no SLA,
+run: the whole thing is Cloudflare free tier. It is a *demo*: no auth, no SLA,
 fair-use rate expectations (~100k requests/day pool). For serious or offline use,
 [download the artifact](https://huggingface.co/datasets/OpenBallast/ballast-t0)
 and serve it yourself.
@@ -29,7 +29,7 @@ config:
 |---|---|---|
 | `resolve` | `name`, `limit=5` | candidate Q-ids for an entity name (normalized label/alias match, most-notable first) |
 | `evidence` | `id` (Q-id or name), `level=5`, `max_triples=32` | one entity's facts as a compact evidence block |
-| `lookup` | `question`, `level=5`, `max_triples=24` | one-shot: mines entity mentions from the question, resolves each, returns evidence blocks — feed them to your model before answering |
+| `lookup` | `question`, `level=5`, `max_triples=24` | one-shot: mines entity mentions from the question, resolves each, returns evidence blocks, feed them to your model before answering |
 
 ### Level semantics
 
@@ -65,7 +65,7 @@ curl -X POST https://mcp.openballast.org/mcp \
 
 ## Recommended prompt pattern
 
-Prepend the evidence blocks, then ask — completion-style for base models:
+Prepend the evidence blocks, then ask (completion-style for base models):
 
 ```
 Facts about Douglas Adams:
